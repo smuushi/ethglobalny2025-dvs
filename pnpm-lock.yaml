@@ -17,6 +17,9 @@ dependencies:
   '@mysten/walrus':
     specifier: ^0.6.2
     version: 0.6.2(typescript@5.9.2)
+  '@mysten/walrus-wasm':
+    specifier: ^0.1.1
+    version: 0.1.1
   '@radix-ui/colors':
     specifier: ^3.0.0
     version: 3.0.0

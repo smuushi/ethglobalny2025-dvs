@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { useSuiClientQuery, useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useSuiClientQuery,
+  useCurrentAccount,
+  useSuiClient,
+} from "@mysten/dapp-kit";
+import { WalrusClient } from "@mysten/walrus";
+import walrusWasmUrl from "@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url";
 import {
   Card,
   Grid,
@@ -30,9 +36,130 @@ interface Game {
 
 export function Store() {
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Initialize Walrus client for reading cover images
+  const walrusClient = new WalrusClient({
+    network: "testnet",
+    suiClient,
+    wasmUrl: walrusWasmUrl,
+    // Note: SSL certificate issues with testnet nodes are handled in error catching
+  });
+
+  // Function to download cover image directly
+  const downloadCoverImage = async (blobId: string, gameTitle: string) => {
+    console.log(
+      `📥 Starting download for blob ID: "${blobId}", game: "${gameTitle}"`,
+    );
+
+    try {
+      // Early return for empty, mock, or invalid blob IDs
+      if (!blobId || blobId === "" || blobId.startsWith("walrus_")) {
+        console.log(`⚠️ Cannot download: invalid blob ID "${blobId}"`);
+        alert("No cover image available for this game");
+        return;
+      }
+
+      console.log(`📡 Fetching from Walrus for blob ID: ${blobId}`);
+
+      // Use Walrus client to get the file
+      const files = await walrusClient.getFiles({ ids: [blobId] });
+      console.log(`📦 Downloaded ${files.length} file(s) from Walrus`);
+
+      if (files.length === 0) {
+        throw new Error(`No files returned for blob ID: ${blobId}`);
+      }
+
+      const walrusFile = files[0];
+      const imageBytes = await walrusFile.bytes();
+      console.log(`📏 Downloaded ${imageBytes.length} bytes`);
+
+      if (!imageBytes || imageBytes.length === 0) {
+        throw new Error(`Empty bytes received for blob ID: ${blobId}`);
+      }
+
+      // Detect actual image format from file headers
+      let mimeType = "image/jpeg"; // default
+      let fileExtension = ".jpg"; // default
+
+      if (imageBytes.length > 8) {
+        const header = Array.from(imageBytes.slice(0, 8))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        console.log(`🔍 Detected image header: ${header}`);
+
+        if (header.startsWith("ffd8ff")) {
+          mimeType = "image/jpeg";
+          fileExtension = ".jpg";
+          console.log(`✅ Detected JPEG format`);
+        } else if (header.startsWith("89504e47")) {
+          mimeType = "image/png";
+          fileExtension = ".png";
+          console.log(`✅ Detected PNG format`);
+        } else if (header.startsWith("47494638")) {
+          mimeType = "image/gif";
+          fileExtension = ".gif";
+          console.log(`✅ Detected GIF format`);
+        } else if (header.startsWith("52494646")) {
+          // Check if it's WebP (RIFF + WEBP)
+          const webpCheck = Array.from(imageBytes.slice(8, 12))
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          if (webpCheck === "57454250") {
+            mimeType = "image/webp";
+            fileExtension = ".webp";
+            console.log(`✅ Detected WebP format`);
+          }
+        } else {
+          console.log(`⚠️ Unknown format (${header}), using JPEG as fallback`);
+        }
+      }
+
+      // Create downloadable blob with correct MIME type
+      console.log(
+        `📁 Creating blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
+      );
+      const imageBlob = new Blob([imageBytes], { type: mimeType });
+
+      // Create download link with correct extension
+      const downloadUrl = URL.createObjectURL(imageBlob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${gameTitle}_cover${fileExtension}`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+
+      console.log(`✅ Successfully downloaded cover image for "${gameTitle}"`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to download cover image for "${gameTitle}":`,
+        error,
+      );
+
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const isSSLError =
+        errorMessage.includes("certificate") ||
+        errorMessage.includes("CERT_") ||
+        errorMessage.includes("SSL") ||
+        errorMessage.includes("TLS");
+
+      const alertMessage = isSSLError
+        ? "Download failed due to SSL certificate issues with Walrus storage nodes"
+        : "Failed to download cover image. Please try again later.";
+
+      alert(alertMessage);
+    }
+  };
 
   // Query all Game objects from the blockchain using multiGetObjects on GameStore
   const gameStoreObjectId = useNetworkVariable("gameStoreObjectId");
@@ -194,7 +321,23 @@ export function Store() {
     ) {
       console.log("🚀 Using allGameObjects data from multiGetObjects");
       const processedGames = processGames(allGameObjects, "multiGetObjects");
-      setGames(processedGames.filter(Boolean) as Game[]);
+      const validGames = processedGames.filter(Boolean) as Game[];
+
+      // Log cover image blob IDs specifically
+      console.log("🖼️ Cover image blob IDs in final games:");
+      validGames.forEach((game, index) => {
+        console.log(
+          `  Game ${index} (${game.title}): cover_image_blob_id = "${game.cover_image_blob_id}"`,
+        );
+        console.log(
+          `    Type: ${typeof game.cover_image_blob_id}, Length: ${game.cover_image_blob_id?.length}`,
+        );
+        console.log(
+          `    Starts with 'walrus_': ${game.cover_image_blob_id?.startsWith("walrus_")}`,
+        );
+      });
+
+      setGames(validGames);
       setLoading(false);
     } else if (!isLoadingAll && gameIds.length > 0) {
       console.log("⚠️ multiGetObjects completed but no data returned");
@@ -225,6 +368,21 @@ export function Store() {
       Array.isArray(allGameObjects) && allGameObjects.length > 0,
     step4_gamesProcessed: games.length > 0,
   });
+
+  // Additional logging for cover image debugging
+  if (games.length > 0) {
+    console.log("🖼️ FINAL COVER IMAGE BLOB IDS:");
+    games.forEach((game, index) => {
+      console.log(
+        `  ${index}. "${game.title}" => "${game.cover_image_blob_id}" (type: ${typeof game.cover_image_blob_id})`,
+      );
+    });
+
+    console.log("📋 COMPLETE GAME DATA (JSON):");
+    games.forEach((game, index) => {
+      console.log(`🎮 Game ${index}:`, JSON.stringify(game, null, 2));
+    });
+  }
 
   const formatPrice = (priceInMist: number) => {
     return (priceInMist / 1000000000).toFixed(2); // Convert MIST to SUI
@@ -324,22 +482,50 @@ export function Store() {
       <Grid columns={{ initial: "1", sm: "2", md: "3" }} gap="4">
         {games.map((game) => (
           <Card key={game.id} size="2" style={{ height: "100%" }}>
-            {/* Cover Image Placeholder */}
+            {/* Cover Image Area with Download Button */}
             <Box
               style={{
                 height: "150px",
+                borderRadius: "6px 6px 0 0",
+                marginBottom: "12px",
                 background:
                   "linear-gradient(135deg, var(--accent-9), var(--accent-7))",
-                borderRadius: "6px 6px 0 0",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                marginBottom: "12px",
+                position: "relative",
               }}
             >
-              <Text size="4" weight="bold" style={{ color: "white" }}>
+              <Text
+                size="4"
+                weight="bold"
+                style={{ color: "white", marginBottom: "8px" }}
+              >
                 {game.title.slice(0, 2).toUpperCase()}
               </Text>
+
+              {/* Download Cover Image Button */}
+              {game.cover_image_blob_id &&
+              !game.cover_image_blob_id.startsWith("walrus_") ? (
+                <Button
+                  size="1"
+                  variant="soft"
+                  onClick={() =>
+                    downloadCoverImage(game.cover_image_blob_id, game.title)
+                  }
+                  style={{
+                    background: "rgba(255, 255, 255, 0.2)",
+                    color: "white",
+                  }}
+                >
+                  📥 Download Cover
+                </Button>
+              ) : (
+                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                  No Cover Image
+                </Text>
+              )}
             </Box>
 
             <Flex

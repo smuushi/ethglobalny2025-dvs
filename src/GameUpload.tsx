@@ -6,6 +6,7 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { WalrusClient, WalrusFile } from "@mysten/walrus";
+import walrusWasmUrl from "@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url";
 import {
   Button,
   Card,
@@ -59,11 +60,70 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-  // Initialize Walrus client
+  // Initialize Walrus client with WASM URL for Vite
   const walrusClient = new WalrusClient({
     network: "testnet",
     suiClient,
+    wasmUrl: walrusWasmUrl,
   });
+
+  // Helper function to get the correct file extension based on MIME type
+  const getFileExtension = (file: File): string => {
+    const mimeType = file.type.toLowerCase();
+    const filename = file.name.toLowerCase();
+    console.log(
+      `🔍 Detecting extension for "${file.name}" - MIME: ${mimeType}`,
+    );
+
+    // Image formats
+    if (mimeType.includes("jpeg") || mimeType.includes("jpg")) {
+      return ".jpg";
+    } else if (mimeType.includes("png")) {
+      return ".png";
+    } else if (mimeType.includes("gif")) {
+      return ".gif";
+    } else if (mimeType.includes("webp")) {
+      return ".webp";
+    } else if (mimeType.includes("bmp")) {
+      return ".bmp";
+    } else if (mimeType.includes("svg")) {
+      return ".svg";
+    }
+    // Archive formats (for game files)
+    else if (mimeType.includes("zip") || mimeType.includes("application/zip")) {
+      return ".zip";
+    } else if (mimeType.includes("rar")) {
+      return ".rar";
+    } else if (mimeType.includes("7z")) {
+      return ".7z";
+    } else if (mimeType.includes("tar")) {
+      return ".tar";
+    }
+    // Executable formats
+    else if (
+      mimeType.includes("application/x-msdownload") ||
+      mimeType.includes("application/x-msdos-program")
+    ) {
+      return ".exe";
+    } else if (mimeType.includes("application/x-apple-diskimage")) {
+      return ".dmg";
+    }
+    // Fallback: try to get extension from filename
+    else {
+      // Extract extension from filename
+      const lastDotIndex = filename.lastIndexOf(".");
+      if (lastDotIndex > 0 && lastDotIndex < filename.length - 1) {
+        const extension = filename.substring(lastDotIndex);
+        console.log(`📁 Using extension from filename: ${extension}`);
+        return extension;
+      } else {
+        console.log(
+          `⚠️ Unknown file type "${mimeType}" and no extension in filename, defaulting to original name`,
+        );
+        return ""; // Keep original filename without adding extension
+      }
+    }
+  };
 
   const handleFileChange =
     (field: "gameFile" | "coverImage") =>
@@ -100,7 +160,7 @@ export function GameUpload() {
       // Convert file to Uint8Array
       const fileData = new Uint8Array(await file.arrayBuffer());
 
-      // Create WalrusFile with metadata
+      // Create WalrusFile with metadata (using object syntax from docs)
       const walrusFile = WalrusFile.from({
         contents: fileData,
         identifier,
@@ -220,9 +280,14 @@ export function GameUpload() {
       });
 
       // Upload game file to Walrus
+      const gameExtension = getFileExtension(metadata.gameFile);
+      console.log(
+        `🎮 Game file: ${metadata.gameFile.name} (${metadata.gameFile.type}) -> ${gameExtension}`,
+      );
+
       const gameWalrusId = await uploadToWalrus(
         metadata.gameFile,
-        `${metadata.title}.zip`,
+        `${metadata.title}${gameExtension}`,
       );
 
       setUploadProgress({
@@ -234,9 +299,15 @@ export function GameUpload() {
       // Upload cover image to Walrus (or use placeholder)
       let coverImageWalrusId = "";
       if (metadata.coverImage) {
+        // PRESERVE ORIGINAL FORMAT: Use actual file extension for proper format preservation
+        const coverExtension = getFileExtension(metadata.coverImage);
+        console.log(
+          `📸 Cover image: ${metadata.coverImage.name} (${metadata.coverImage.type}) -> ${coverExtension}`,
+        );
+
         coverImageWalrusId = await uploadToWalrus(
           metadata.coverImage,
-          `${metadata.title}_cover.jpg`,
+          `${metadata.title}_cover${coverExtension}`,
         );
       }
 
@@ -394,11 +465,11 @@ export function GameUpload() {
 
           <Box>
             <Text as="label" size="2" weight="bold">
-              Game File (ZIP) *
+              Game File *
             </Text>
             <input
               type="file"
-              accept=".zip,.rar,.7z"
+              accept=".zip,.rar,.7z,.tar,.exe,.dmg"
               onChange={handleFileChange("gameFile")}
               style={{
                 width: "100%",
@@ -407,7 +478,11 @@ export function GameUpload() {
                 borderRadius: "6px",
                 marginTop: "4px",
               }}
+              required
             />
+            <Text size="1" color="gray">
+              Supported: ZIP, RAR, 7Z, TAR, EXE, DMG files
+            </Text>
             {metadata.gameFile && (
               <Text size="1" color="gray">
                 Selected: {metadata.gameFile.name} (
@@ -422,7 +497,7 @@ export function GameUpload() {
             </Text>
             <input
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.gif,.webp"
               onChange={handleFileChange("coverImage")}
               style={{
                 width: "100%",
@@ -432,9 +507,13 @@ export function GameUpload() {
                 marginTop: "4px",
               }}
             />
+            <Text size="1" color="gray">
+              Supported: JPG, PNG, GIF, WebP images
+            </Text>
             {metadata.coverImage && (
               <Text size="1" color="gray">
-                Selected: {metadata.coverImage.name}
+                Selected: {metadata.coverImage.name} (
+                {(metadata.coverImage.size / 1024).toFixed(1)} KB)
               </Text>
             )}
           </Box>
