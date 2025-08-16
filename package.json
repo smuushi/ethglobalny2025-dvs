@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@mysten/dapp-kit": "0.17.3",
+    "@mysten/seal": "^0.4.21",
     "@mysten/sui": "1.37.2",
+    "@mysten/walrus": "^0.6.2",
     "@radix-ui/colors": "^3.0.0",
     "@radix-ui/react-icons": "^1.3.0",
     "@radix-ui/themes": "^3.2.1",
