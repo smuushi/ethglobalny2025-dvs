@@ -6,6 +6,7 @@ import {
 } from "@mysten/dapp-kit";
 import { WalrusClient } from "@mysten/walrus";
 import walrusWasmUrl from "@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url";
+import { fileTypeFromBuffer } from "file-type";
 import {
   Card,
   Grid,
@@ -52,7 +53,7 @@ export function Store() {
   // Function to download cover image directly
   const downloadCoverImage = async (blobId: string, gameTitle: string) => {
     console.log(
-      `📥 Starting download for blob ID: "${blobId}", game: "${gameTitle}"`,
+      `📥 Starting cover image download for blob ID: "${blobId}", game: "${gameTitle}"`,
     );
 
     try {
@@ -63,11 +64,13 @@ export function Store() {
         return;
       }
 
-      console.log(`📡 Fetching from Walrus for blob ID: ${blobId}`);
+      console.log(`📡 Fetching cover image from Walrus for blob ID: ${blobId}`);
 
       // Use Walrus client to get the file
       const files = await walrusClient.getFiles({ ids: [blobId] });
-      console.log(`📦 Downloaded ${files.length} file(s) from Walrus`);
+      console.log(
+        `📦 Downloaded ${files.length} cover image file(s) from Walrus`,
+      );
 
       if (files.length === 0) {
         throw new Error(`No files returned for blob ID: ${blobId}`);
@@ -75,52 +78,41 @@ export function Store() {
 
       const walrusFile = files[0];
       const imageBytes = await walrusFile.bytes();
-      console.log(`📏 Downloaded ${imageBytes.length} bytes`);
+      console.log(`📏 Downloaded ${imageBytes.length} bytes for cover image`);
 
       if (!imageBytes || imageBytes.length === 0) {
         throw new Error(`Empty bytes received for blob ID: ${blobId}`);
       }
 
-      // Detect actual image format from file headers
-      let mimeType = "image/jpeg"; // default
-      let fileExtension = ".jpg"; // default
+      // Use file-type library for robust image format detection
+      console.log(
+        `🔍 Analyzing ${imageBytes.length} bytes of cover image with file-type library...`,
+      );
 
-      if (imageBytes.length > 8) {
-        const header = Array.from(imageBytes.slice(0, 8))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        console.log(`🔍 Detected image header: ${header}`);
+      const fileType = await fileTypeFromBuffer(imageBytes);
 
-        if (header.startsWith("ffd8ff")) {
+      if (!fileType) {
+        console.log(`⚠️ Could not detect image type, defaulting to JPEG`);
+        var mimeType = "image/jpeg";
+        var fileExtension = ".jpg";
+      } else {
+        console.log(`✅ Detected cover image type:`, fileType);
+        mimeType = fileType.mime;
+        fileExtension = `.${fileType.ext}`;
+
+        // Validate it's actually an image
+        if (!mimeType.startsWith("image/")) {
+          console.log(
+            `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
+          );
           mimeType = "image/jpeg";
           fileExtension = ".jpg";
-          console.log(`✅ Detected JPEG format`);
-        } else if (header.startsWith("89504e47")) {
-          mimeType = "image/png";
-          fileExtension = ".png";
-          console.log(`✅ Detected PNG format`);
-        } else if (header.startsWith("47494638")) {
-          mimeType = "image/gif";
-          fileExtension = ".gif";
-          console.log(`✅ Detected GIF format`);
-        } else if (header.startsWith("52494646")) {
-          // Check if it's WebP (RIFF + WEBP)
-          const webpCheck = Array.from(imageBytes.slice(8, 12))
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
-          if (webpCheck === "57454250") {
-            mimeType = "image/webp";
-            fileExtension = ".webp";
-            console.log(`✅ Detected WebP format`);
-          }
-        } else {
-          console.log(`⚠️ Unknown format (${header}), using JPEG as fallback`);
         }
       }
 
       // Create downloadable blob with correct MIME type
       console.log(
-        `📁 Creating blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
+        `📁 Creating cover image blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
       );
       const imageBlob = new Blob([imageBytes], { type: mimeType });
 
@@ -154,8 +146,147 @@ export function Store() {
         errorMessage.includes("TLS");
 
       const alertMessage = isSSLError
-        ? "Download failed due to SSL certificate issues with Walrus storage nodes"
+        ? "Cover image download failed due to SSL certificate issues with Walrus storage nodes"
         : "Failed to download cover image. Please try again later.";
+
+      alert(alertMessage);
+    }
+  };
+
+  // Function to download game file directly
+  const downloadGameFile = async (blobId: string, gameTitle: string) => {
+    console.log(
+      `🎮 Starting game file download for blob ID: "${blobId}", game: "${gameTitle}"`,
+    );
+
+    try {
+      // Early return for empty, mock, or invalid blob IDs
+      if (!blobId || blobId === "" || blobId.startsWith("walrus_")) {
+        console.log(`⚠️ Cannot download: invalid game blob ID "${blobId}"`);
+        alert("No game file available for this game");
+        return;
+      }
+
+      console.log(`📡 Fetching game file from Walrus for blob ID: ${blobId}`);
+
+      // Use Walrus client to get the file
+      const files = await walrusClient.getFiles({ ids: [blobId] });
+      console.log(`📦 Downloaded ${files.length} game file(s) from Walrus`);
+
+      if (files.length === 0) {
+        throw new Error(`No game files returned for blob ID: ${blobId}`);
+      }
+
+      const walrusFile = files[0];
+      const gameBytes = await walrusFile.bytes();
+      console.log(`📏 Downloaded ${gameBytes.length} bytes for game file`);
+
+      if (!gameBytes || gameBytes.length === 0) {
+        throw new Error(`Empty bytes received for game blob ID: ${blobId}`);
+      }
+
+      // Use file-type library for robust format detection
+      console.log(
+        `🔍 Analyzing ${gameBytes.length} bytes with file-type library...`,
+      );
+
+      // Log first 16 bytes for debugging
+      const header = Array.from(
+        gameBytes.slice(0, Math.min(16, gameBytes.length)),
+      )
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      console.log(
+        `🔍 File header (${Math.min(16, gameBytes.length)} bytes): ${header}`,
+      );
+
+      // Use file-type library to detect format
+      const fileType = await fileTypeFromBuffer(gameBytes);
+
+      if (!fileType) {
+        throw new Error(
+          `❌ Could not detect file type! Header: ${header}. File might be corrupted or in an unsupported format.`,
+        );
+      }
+
+      console.log(`✅ Detected file type:`, fileType);
+      console.log(`📁 MIME type: ${fileType.mime}`);
+      console.log(`📁 Extension: .${fileType.ext}`);
+
+      const mimeType = fileType.mime;
+      const fileExtension = `.${fileType.ext}`;
+
+      // Validate that it's a reasonable format for a game file
+      const gameFileFormats = [
+        "application/zip",
+        "application/x-rar-compressed",
+        "application/x-7z-compressed",
+        "application/x-tar",
+        "application/gzip",
+        "application/x-bzip2",
+        "application/x-msdownload", // .exe
+        "application/x-apple-diskimage", // .dmg
+        "application/octet-stream", // generic binary
+      ];
+
+      const textFormats = [
+        "text/html",
+        "text/plain",
+        "application/json",
+        "text/javascript",
+        "text/css",
+      ];
+
+      if (textFormats.includes(mimeType)) {
+        throw new Error(
+          `❌ Text/web file detected (${mimeType}). Expected archive or binary format for game files.`,
+        );
+      }
+
+      if (!gameFileFormats.includes(mimeType)) {
+        console.log(
+          `⚠️ Unusual file type for game: ${mimeType}. Allowing download but verify this is correct.`,
+        );
+      }
+
+      // Create downloadable blob with correct MIME type
+      console.log(
+        `📁 Creating game file blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
+      );
+      const gameBlob = new Blob([gameBytes], { type: mimeType });
+
+      // Create download link with correct extension
+      const downloadUrl = URL.createObjectURL(gameBlob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${gameTitle}_game${fileExtension}`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+
+      console.log(`✅ Successfully downloaded game file for "${gameTitle}"`);
+    } catch (error) {
+      console.error(
+        `❌ Failed to download game file for "${gameTitle}":`,
+        error,
+      );
+
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const isSSLError =
+        errorMessage.includes("certificate") ||
+        errorMessage.includes("CERT_") ||
+        errorMessage.includes("SSL") ||
+        errorMessage.includes("TLS");
+
+      const alertMessage = isSSLError
+        ? "Game file download failed due to SSL certificate issues with Walrus storage nodes"
+        : "Failed to download game file. Please try again later.";
 
       alert(alertMessage);
     }
@@ -517,13 +648,43 @@ export function Store() {
                   style={{
                     background: "rgba(255, 255, 255, 0.2)",
                     color: "white",
+                    marginBottom: "4px",
                   }}
                 >
                   📥 Download Cover
                 </Button>
               ) : (
-                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
+                <Text
+                  size="1"
+                  style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    marginBottom: "4px",
+                  }}
+                >
                   No Cover Image
+                </Text>
+              )}
+
+              {/* Download Game File Button */}
+              {game.walrus_blob_id &&
+              !game.walrus_blob_id.startsWith("walrus_") ? (
+                <Button
+                  size="1"
+                  variant="soft"
+                  onClick={() =>
+                    downloadGameFile(game.walrus_blob_id, game.title)
+                  }
+                  style={{
+                    background: "rgba(255, 255, 255, 0.15)",
+                    color: "white",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                  }}
+                >
+                  🎮 Download Game
+                </Button>
+              ) : (
+                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.5)" }}>
+                  No Game File
                 </Text>
               )}
             </Box>

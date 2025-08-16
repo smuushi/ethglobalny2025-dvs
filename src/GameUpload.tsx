@@ -7,6 +7,7 @@ import {
 import { Transaction } from "@mysten/sui/transactions";
 import { WalrusClient, WalrusFile } from "@mysten/walrus";
 import walrusWasmUrl from "@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url";
+import { fileTypeFromBuffer } from "file-type";
 import {
   Button,
   Card,
@@ -160,19 +161,63 @@ export function GameUpload() {
       // Convert file to Uint8Array
       const fileData = new Uint8Array(await file.arrayBuffer());
 
-      // Create WalrusFile with metadata (using object syntax from docs)
+      // Use file-type library to validate and detect actual format
+      const fileType = await fileTypeFromBuffer(fileData);
+      console.log(`🔍 Detected file type for upload:`, fileType);
+
+      let actualMimeType = file.type || "application/octet-stream";
+      if (fileType) {
+        actualMimeType = fileType.mime;
+        console.log(
+          `📁 Using detected MIME type: ${actualMimeType} (was: ${file.type})`,
+        );
+      }
+
+      // Validate file type is appropriate
+      if (identifier.includes("_cover")) {
+        // Cover image validation
+        if (fileType && !fileType.mime.startsWith("image/")) {
+          throw new Error(
+            `❌ Cover image must be an image file. Detected: ${fileType.mime}`,
+          );
+        }
+      } else {
+        // Game file validation - warn about unusual formats
+        const gameFileFormats = [
+          "application/zip",
+          "application/x-rar-compressed",
+          "application/x-7z-compressed",
+          "application/x-tar",
+          "application/gzip",
+          "application/x-bzip2",
+          "application/x-msdownload", // .exe
+          "application/x-apple-diskimage", // .dmg
+        ];
+
+        if (fileType && !gameFileFormats.includes(fileType.mime)) {
+          console.log(
+            `⚠️ Unusual game file format: ${fileType.mime}. Continuing upload but verify this is correct.`,
+          );
+        }
+      }
+
+      // Create WalrusFile with detected metadata
       const walrusFile = WalrusFile.from({
         contents: fileData,
         identifier,
         tags: {
-          "content-type": file.type || "application/octet-stream",
+          "content-type": actualMimeType,
           "upload-source": "coldcache",
           "game-file": identifier.includes(".zip") ? "true" : "false",
           "cover-image": identifier.includes("_cover") ? "true" : "false",
+          "detected-type": fileType ? fileType.ext : "unknown",
+          "original-name": file.name,
         },
       });
 
-      console.log(`📦 Created WalrusFile for ${identifier}`);
+      console.log(
+        `📦 Created WalrusFile for ${identifier} with type ${actualMimeType}`,
+      );
 
       // Use the browser-compatible flow for wallet signing
       const flow = walrusClient.writeFilesFlow({
