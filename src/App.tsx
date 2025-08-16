@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Counter } from "./Counter";
 import { CreateCounter } from "./CreateCounter";
 import { GameUpload } from "./GameUpload";
+import { Store } from "./Store";
 
 function App() {
   const currentAccount = useCurrentAccount();
@@ -40,13 +41,18 @@ function App() {
           style={{ background: "var(--gray-a2)", minHeight: 500 }}
         >
           {currentAccount ? (
-            <Tabs.Root defaultValue="upload">
+            <Tabs.Root defaultValue="store">
               <Tabs.List>
+                <Tabs.Trigger value="store">Browse Games</Tabs.Trigger>
                 <Tabs.Trigger value="upload">Publish Game</Tabs.Trigger>
                 <Tabs.Trigger value="demo">Demo Counter</Tabs.Trigger>
               </Tabs.List>
 
               <Box mt="4">
+                <Tabs.Content value="store">
+                  <Store />
+                </Tabs.Content>
+
                 <Tabs.Content value="upload">
                   <GameUpload />
                 </Tabs.Content>
