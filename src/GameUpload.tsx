@@ -2,10 +2,10 @@ import { useState } from "react";
 import {
   useSignAndExecuteTransaction,
   useCurrentAccount,
+  useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-// import { WalrusClient } from "@mysten/walrus";
-// import { WalrusFile } from "@mysten/walrus";
+import { WalrusClient, WalrusFile } from "@mysten/walrus";
 import {
   Button,
   Card,
@@ -35,7 +35,7 @@ export function GameUpload() {
   const currentAccount = useCurrentAccount();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const gameStoreObjectId = useNetworkVariable("gameStoreObjectId");
-  // const suiClient = useSuiClient(); // TODO: Will be needed for real Walrus integration
+  const suiClient = useSuiClient();
 
   const [metadata, setMetadata] = useState<GameMetadata>({
     title: "",
@@ -59,10 +59,11 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-  // const walrusClient = new WalrusClient({
-  //   network: 'testnet',
-  //   suiClient,
-  // });
+  // Initialize Walrus client
+  const walrusClient = new WalrusClient({
+    network: "testnet",
+    suiClient,
+  });
 
   const handleFileChange =
     (field: "gameFile" | "coverImage") =>
@@ -92,41 +93,101 @@ export function GameUpload() {
     }
 
     try {
-      // For now, let's use a mock upload since the Walrus SDK requires more complex setup
-      // TODO: Implement real Walrus upload once we have proper keypair signing
-      console.log(`Mock uploading ${identifier} of size ${file.size} bytes`);
+      console.log(
+        `🚀 Starting Walrus upload: ${identifier} (${file.size} bytes)`,
+      );
 
-      // Simulate upload delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Convert file to Uint8Array
+      const fileData = new Uint8Array(await file.arrayBuffer());
 
-      // Return a mock blob ID that looks realistic
-      const mockBlobId = `walrus_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create WalrusFile with metadata
+      const walrusFile = WalrusFile.from({
+        contents: fileData,
+        identifier,
+        tags: {
+          "content-type": file.type || "application/octet-stream",
+          "upload-source": "coldcache",
+          "game-file": identifier.includes(".zip") ? "true" : "false",
+          "cover-image": identifier.includes("_cover") ? "true" : "false",
+        },
+      });
 
-      console.log(`Mock upload complete: ${mockBlobId}`);
-      return mockBlobId;
+      console.log(`📦 Created WalrusFile for ${identifier}`);
 
-      // Real Walrus implementation would be:
-      // const fileData = new Uint8Array(await file.arrayBuffer());
-      // const walrusFile = WalrusFile.from({
-      //   contents: fileData,
-      //   identifier,
-      //   tags: {
-      //     'content-type': file.type || 'application/octet-stream',
-      //     'upload-source': 'coldcache',
-      //   },
-      // });
-      //
-      // const [result] = await walrusClient.writeFiles({
-      //   files: [walrusFile],
-      //   epochs: 5,
-      //   deletable: false,
-      //   signer: properKeypairSigner, // Need to set up proper keypair
-      // });
-      //
-      // return result.blobId;
+      // Use the browser-compatible flow for wallet signing
+      const flow = walrusClient.writeFilesFlow({
+        files: [walrusFile],
+      });
+
+      console.log(`🔄 Encoding file...`);
+      await flow.encode();
+
+      console.log(`📝 Creating register transaction...`);
+      const registerTx = flow.register({
+        epochs: 5, // Store for 5 epochs (~30 days)
+        owner: currentAccount.address,
+        deletable: false,
+      });
+
+      // Sign and execute the register transaction
+      console.log(`✍️ Signing register transaction...`);
+      const registerResult = await new Promise<any>((resolve, reject) => {
+        signAndExecute(
+          { transaction: registerTx },
+          {
+            onSuccess: (result) => {
+              console.log(`✅ Register transaction successful:`, result.digest);
+              resolve(result);
+            },
+            onError: (error) => {
+              console.error(`❌ Register transaction failed:`, error);
+              reject(error);
+            },
+          },
+        );
+      });
+
+      // Upload the data to storage nodes
+      console.log(`☁️ Uploading to Walrus storage nodes...`);
+      await flow.upload({
+        digest: registerResult.digest,
+      });
+
+      // Create and execute the certify transaction
+      console.log(`📋 Creating certify transaction...`);
+      const certifyTx = flow.certify();
+
+      await new Promise((resolve, reject) => {
+        signAndExecute(
+          { transaction: certifyTx },
+          {
+            onSuccess: (result) => {
+              console.log(`✅ Certify transaction successful:`, result.digest);
+              resolve(result);
+            },
+            onError: (error) => {
+              console.error(`❌ Certify transaction failed:`, error);
+              reject(error);
+            },
+          },
+        );
+      });
+
+      // Get the final blob ID
+      const files = await flow.listFiles();
+      if (files.length === 0) {
+        throw new Error("No files were uploaded successfully");
+      }
+
+      const blobId = files[0].blobId;
+      console.log(`🎉 Walrus upload complete! Blob ID: ${blobId}`);
+
+      return blobId;
     } catch (error) {
-      console.error("Walrus upload error:", error);
-      throw new Error(`Failed to upload ${identifier}: ${error}`);
+      console.error(`💥 Walrus upload error for ${identifier}:`, error);
+      throw new Error(
+        `Failed to upload ${identifier}: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   };
 
@@ -153,7 +214,7 @@ export function GameUpload() {
 
     try {
       setUploadProgress({
-        step: "Step 1/4: Processing game file for Walrus storage...",
+        step: "Step 1/4: Uploading game file to Walrus storage...",
         progress: 25,
         isUploading: true,
       });
@@ -165,7 +226,7 @@ export function GameUpload() {
       );
 
       setUploadProgress({
-        step: "Step 2/4: Processing cover image for Walrus...",
+        step: "Step 2/4: Uploading cover image to Walrus...",
         progress: 50,
         isUploading: true,
       });
@@ -423,9 +484,9 @@ export function GameUpload() {
         </Button>
 
         <Text size="1" color="gray">
-          * Your game will be registered as an NFT on Sui blockchain. File
-          storage is currently simulated for testing - real Walrus integration
-          coming soon!
+          * Your game will be uploaded to decentralized Walrus storage and
+          registered as an NFT on Sui blockchain. This process involves multiple
+          wallet signatures for secure storage.
         </Text>
       </Flex>
     </Card>
