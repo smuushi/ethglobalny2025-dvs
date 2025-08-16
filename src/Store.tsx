@@ -22,6 +22,13 @@ interface GameFileMetadata {
   upload_timestamp: number;
 }
 
+interface GameFileMetadata {
+  original_filename: string;
+  file_size: number;
+  content_type: string;
+  upload_timestamp: number;
+}
+
 interface Game {
   id: string;
   title: string;
@@ -45,12 +52,16 @@ export function Store() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Function to download cover image via CDN
-  const downloadCoverImage = async (
-    patchId: string,
-    gameTitle: string,
-    game?: Game,
-  ) => {
+  // Initialize Walrus client for reading cover images
+  const walrusClient = new WalrusClient({
+    network: "testnet",
+    suiClient,
+    wasmUrl: walrusWasmUrl,
+    // Note: SSL certificate issues with testnet nodes are handled in error catching
+  });
+
+  // Function to download cover image directly
+  const downloadCoverImage = async (blobId: string, gameTitle: string) => {
     console.log(
       `📥 Starting cover image download for patch ID: "${patchId}", game: "${gameTitle}"`,
     );
@@ -63,33 +74,49 @@ export function Store() {
         return;
       }
 
-      // Use aggregator CDN for direct download
-      const AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
-      const CDNLink = `${AGGREGATOR_URL}/v1/blobs/by-quilt-patch-id/${patchId}`;
+      console.log(`📡 Fetching cover image from Walrus for blob ID: ${blobId}`);
 
-      console.log(`📡 Using CDN link for cover image download: ${CDNLink}`);
+      // Use Walrus client to get the file
+      const files = await walrusClient.getFiles({ ids: [blobId] });
+      console.log(
+        `📦 Downloaded ${files.length} cover image file(s) from Walrus`,
+      );
 
-      // Determine filename for download
-      let downloadFilename: string;
-      if (game?.cover_image_metadata?.original_filename) {
-        downloadFilename = game.cover_image_metadata.original_filename.replace(
-          /[<>:"/\\|?*]/g,
-          "_",
-        );
-        console.log(`💾 Using original filename: ${downloadFilename}`);
+      if (files.length === 0) {
+        throw new Error(`No files returned for blob ID: ${blobId}`);
+      }
+
+      const walrusFile = files[0];
+      const imageBytes = await walrusFile.bytes();
+      console.log(`📏 Downloaded ${imageBytes.length} bytes for cover image`);
+
+      if (!imageBytes || imageBytes.length === 0) {
+        throw new Error(`Empty bytes received for blob ID: ${blobId}`);
+      }
+
+      // Use file-type library for robust image format detection
+      console.log(
+        `🔍 Analyzing ${imageBytes.length} bytes of cover image with file-type library...`,
+      );
+
+      const fileType = await fileTypeFromBuffer(imageBytes);
+
+      if (!fileType) {
+        console.log(`⚠️ Could not detect image type, defaulting to JPEG`);
+        var mimeType = "image/jpeg";
+        var fileExtension = ".jpg";
       } else {
         console.log(`✅ Detected cover image type:`, fileType);
         mimeType = fileType.mime;
         fileExtension = `.${fileType.ext}`;
 
-        // Validate it's actually an image
-        if (!mimeType.startsWith("image/")) {
-          console.log(
-            `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
-          );
-          mimeType = "image/jpeg";
-          fileExtension = ".jpg";
-        }
+      // Validate it's actually an image
+      if (!mimeType.startsWith("image/")) {
+        console.log(
+          `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
+        );
+        mimeType = "image/jpeg";
+        fileExtension = ".jpg";
       }
 
       // Create downloadable blob with correct MIME type
@@ -98,11 +125,23 @@ export function Store() {
       );
       const imageBlob = new Blob([Uint8Array.from(imageBytes)], { type: mimeType });
 
+      // Create filename using contract metadata when possible
+      let fileName: string;
+      if (originalFileName) {
+        fileName = originalFileName.replace(/[<>:"/\\|?*]/g, "_");
+        console.log(`💾 Using original cover image filename: ${fileName}`);
+      } else {
+        fileName = `${gameTitle}_cover${fileExtension}`.replace(
+          /[<>:"/\\|?*]/g,
+          "_",
+        );
+        console.log(`💾 Using constructed cover filename: ${fileName}`);
+      }
+
       // Create download link that uses the CDN
       const link = document.createElement("a");
-      link.href = CDNLink;
-      link.download = downloadFilename;
-      link.style.display = "none";
+      link.href = downloadUrl;
+      link.download = `${gameTitle}_cover${fileExtension}`;
 
       // Trigger download
       document.body.appendChild(link);
@@ -127,12 +166,8 @@ export function Store() {
     }
   };
 
-  // Function to download game file directly with enhanced metadata handling
-  const downloadGameFile = async (
-    patchId: string,
-    gameTitle: string,
-    game?: Game,
-  ) => {
+  // Function to download game file directly
+  const downloadGameFile = async (blobId: string, gameTitle: string) => {
     console.log(
       `🎮 Starting game file download for patch ID: "${patchId}", game: "${gameTitle}"`,
     );
@@ -145,18 +180,45 @@ export function Store() {
         return;
       }
 
-      // Use aggregator CDN for direct download
-      const AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
-      const CDNLink = `${AGGREGATOR_URL}/v1/blobs/by-quilt-patch-id/${patchId}`;
+      console.log(`📡 Fetching game file from Walrus for blob ID: ${blobId}`);
 
-      console.log(`📡 Using CDN link for download: ${CDNLink}`);
+      // Use Walrus client to get the file
+      const files = await walrusClient.getFiles({ ids: [blobId] });
+      console.log(`📦 Downloaded ${files.length} game file(s) from Walrus`);
 
-      // Determine filename for download
-      let downloadFilename: string;
-      if (game?.game_file_metadata?.original_filename) {
-        downloadFilename = game.game_file_metadata.original_filename.replace(
-          /[<>:"/\\|?*]/g,
-          "_",
+      if (files.length === 0) {
+        throw new Error(`No game files returned for blob ID: ${blobId}`);
+      }
+
+      const walrusFile = files[0];
+      const gameBytes = await walrusFile.bytes();
+      console.log(`📏 Downloaded ${gameBytes.length} bytes for game file`);
+
+      if (!gameBytes || gameBytes.length === 0) {
+        throw new Error(`Empty bytes received for game blob ID: ${blobId}`);
+      }
+
+      // Use file-type library for robust format detection
+      console.log(
+        `🔍 Analyzing ${gameBytes.length} bytes with file-type library...`,
+      );
+
+      // Log first 16 bytes for debugging
+      const header = Array.from(
+        gameBytes.slice(0, Math.min(16, gameBytes.length)),
+      )
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      console.log(
+        `🔍 File header (${Math.min(16, gameBytes.length)} bytes): ${header}`,
+      );
+
+      // Use file-type library to detect format
+      const fileType = await fileTypeFromBuffer(gameBytes);
+
+      if (!fileType) {
+        throw new Error(
+          `❌ Could not detect file type! Header: ${header}. File might be corrupted or in an unsupported format.`,
         );
       }
 
@@ -204,32 +266,28 @@ export function Store() {
       console.log(
         `📁 Creating game file blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
       );
-      const gameBlob = new Blob([gameBytes], { type: mimeType });
+      const gameBlob = new Blob([Uint8Array.from(gameBytes)], { type: mimeType });
 
       // Create download link that uses the CDN
       const link = document.createElement("a");
-      link.href = CDNLink;
-      link.download = downloadFilename;
-      link.style.display = "none";
+      link.href = downloadUrl;
+      link.download = `${gameTitle}_game${fileExtension}`;
 
       // Trigger download
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      console.log(
-        `✅ Successfully initiated download for "${gameTitle}" via CDN`,
-      );
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
 
-      // Show confirmation message
-      const fileSize = game?.game_file_metadata?.file_size
-        ? (game.game_file_metadata.file_size / 1024 / 1024).toFixed(1) + " MB"
-        : "Unknown size";
-
-      alert(
-        `🎮 Download started for "${gameTitle}"!\n\nFile: ${downloadFilename}\nSize: ${fileSize}\nUsing CDN: ${CDNLink}`,
-      );
+      console.log(`✅ Successfully downloaded game file for "${gameTitle}"`);
     } catch (error) {
+      console.error(
+        `❌ Failed to download game file for "${gameTitle}":`,
+        error,
+      );
+
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.error(`❌ Failed to download game file:`, {
@@ -605,152 +663,53 @@ export function Store() {
             >
               {game.cover_image_blob_id &&
               !game.cover_image_blob_id.startsWith("walrus_") ? (
-                <>
-                  {/* Display cover image from CDN */}
-                  <img
-                    src={`https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${game.cover_image_blob_id}`}
-                    alt={`${game.title} cover`}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                    onError={(e) => {
-                      // Fallback to gradient background with title if image fails
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const parent = target.parentElement;
-                      if (parent) {
-                        parent.style.background =
-                          "linear-gradient(135deg, var(--accent-9), var(--accent-7))";
-                        parent.style.display = "flex";
-                        parent.style.alignItems = "center";
-                        parent.style.justifyContent = "center";
-                        const fallbackText = document.createElement("div");
-                        fallbackText.textContent = game.title
-                          .slice(0, 2)
-                          .toUpperCase();
-                        fallbackText.style.color = "white";
-                        fallbackText.style.fontSize = "24px";
-                        fallbackText.style.fontWeight = "bold";
-                        parent.appendChild(fallbackText);
-                      }
-                    }}
-                  />
-                  {/* Small download button overlay */}
-                  <Button
-                    size="1"
-                    variant="soft"
-                    onClick={() =>
-                      downloadCoverImage(
-                        game.cover_image_blob_id,
-                        game.title,
-                        game,
-                      )
-                    }
-                    style={{
-                      position: "absolute",
-                      top: "8px",
-                      right: "8px",
-                      background: "rgba(0, 0, 0, 0.7)",
-                      color: "white",
-                      border: "none",
-                      padding: "4px 8px",
-                      fontSize: "10px",
-                      borderRadius: "4px",
-                    }}
-                  >
-                    ⬇️
-                  </Button>
-                  {/* Download Game File Button overlay */}
-                  {game.walrus_blob_id &&
-                    !game.walrus_blob_id.startsWith("walrus_") && (
-                      <Button
-                        size="1"
-                        variant="soft"
-                        onClick={() =>
-                          downloadGameFile(
-                            game.walrus_blob_id,
-                            game.title,
-                            game,
-                          )
-                        }
-                        style={{
-                          position: "absolute",
-                          bottom: "8px",
-                          right: "8px",
-                          background: "rgba(0, 0, 0, 0.7)",
-                          color: "white",
-                          border: "none",
-                          padding: "4px 8px",
-                          fontSize: "10px",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        🎮
-                      </Button>
-                    )}
-                </>
-              ) : (
-                // Fallback for games without cover images
-                <Box
+                <Button
+                  size="1"
+                  variant="soft"
+                  onClick={() =>
+                    downloadCoverImage(game.cover_image_blob_id, game.title)
+                  }
                   style={{
-                    width: "100%",
-                    height: "100%",
-                    background:
-                      "linear-gradient(135deg, var(--accent-9), var(--accent-7))",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    position: "relative",
+                    background: "rgba(255, 255, 255, 0.2)",
+                    color: "white",
+                    marginBottom: "4px",
                   }}
                 >
-                  <Text
-                    size="4"
-                    weight="bold"
-                    style={{ color: "white", marginBottom: "8px" }}
-                  >
-                    {game.title.slice(0, 2).toUpperCase()}
-                  </Text>
-                  <Text
-                    size="1"
-                    style={{
-                      color: "rgba(255, 255, 255, 0.7)",
-                      fontStyle: "italic",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    No Cover Image
-                  </Text>
-                  {/* Download Game File Button for games without cover */}
-                  {game.walrus_blob_id &&
-                  !game.walrus_blob_id.startsWith("walrus_") ? (
-                    <Button
-                      size="1"
-                      variant="soft"
-                      onClick={() =>
-                        downloadGameFile(game.walrus_blob_id, game.title, game)
-                      }
-                      style={{
-                        background: "rgba(255, 255, 255, 0.15)",
-                        color: "white",
-                        border: "1px solid rgba(255, 255, 255, 0.3)",
-                        padding: "4px 8px",
-                        fontSize: "10px",
-                      }}
-                    >
-                      🎮 Download Game
-                    </Button>
-                  ) : (
-                    <Text
-                      size="1"
-                      style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                    >
-                      No Game File
-                    </Text>
-                  )}
-                </Box>
+                  📥 Download Cover
+                </Button>
+              ) : (
+                <Text
+                  size="1"
+                  style={{
+                    color: "rgba(255, 255, 255, 0.7)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  No Cover Image
+                </Text>
+              )}
+
+              {/* Download Game File Button */}
+              {game.walrus_blob_id &&
+              !game.walrus_blob_id.startsWith("walrus_") ? (
+                <Button
+                  size="1"
+                  variant="soft"
+                  onClick={() =>
+                    downloadGameFile(game.walrus_blob_id, game.title)
+                  }
+                  style={{
+                    background: "rgba(255, 255, 255, 0.15)",
+                    color: "white",
+                    border: "1px solid rgba(255, 255, 255, 0.3)",
+                  }}
+                >
+                  🎮 Download Game
+                </Button>
+              ) : (
+                <Text size="1" style={{ color: "rgba(255, 255, 255, 0.5)" }}>
+                  No Game File
+                </Text>
               )}
             </Box>
 
