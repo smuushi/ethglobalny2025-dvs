@@ -13,6 +13,13 @@ module game_store::game_store {
     const ENotOwner: u64 = 2;
     const EGameNotActive: u64 = 3;
 
+    public struct GameFileMetadata has store, copy, drop {
+        original_filename: String,
+        file_size: u64,
+        content_type: String,
+        upload_timestamp: u64,
+    }
+
     public struct Game has key, store {
         id: UID,
         title: String,
@@ -25,6 +32,9 @@ module game_store::game_store {
         publish_date: u64,
         is_active: bool,
         total_sales: u64,
+        // Enhanced metadata fields
+        game_file_metadata: GameFileMetadata,
+        cover_image_metadata: GameFileMetadata,
     }
 
     public struct GameNFT has key, store {
@@ -66,6 +76,16 @@ module game_store::game_store {
         transfer::share_object(store);
     }
 
+    public entry fun create_new_store(ctx: &mut TxContext) {
+        let store = GameStore {
+            id: object::new(ctx),
+            admin: tx_context::sender(ctx),
+            games: vector::empty<ID>(),
+            total_games: 0,
+        };
+        transfer::share_object(store);
+    }
+
     public fun publish_game(
         store: &mut GameStore,
         title: vector<u8>,
@@ -74,8 +94,30 @@ module game_store::game_store {
         walrus_blob_id: vector<u8>,
         cover_image_blob_id: vector<u8>,
         genre: vector<u8>,
+        // Game file metadata
+        game_filename: vector<u8>,
+        game_file_size: u64,
+        game_content_type: vector<u8>,
+        // Cover image metadata
+        cover_filename: vector<u8>,
+        cover_file_size: u64,
+        cover_content_type: vector<u8>,
         ctx: &mut TxContext
     ): ID {
+        let game_metadata = GameFileMetadata {
+            original_filename: string::utf8(game_filename),
+            file_size: game_file_size,
+            content_type: string::utf8(game_content_type),
+            upload_timestamp: tx_context::epoch_timestamp_ms(ctx),
+        };
+
+        let cover_metadata = GameFileMetadata {
+            original_filename: string::utf8(cover_filename),
+            file_size: cover_file_size,
+            content_type: string::utf8(cover_content_type),
+            upload_timestamp: tx_context::epoch_timestamp_ms(ctx),
+        };
+
         let game = Game {
             id: object::new(ctx),
             title: string::utf8(title),
@@ -88,6 +130,8 @@ module game_store::game_store {
             publish_date: tx_context::epoch(ctx),
             is_active: true,
             total_sales: 0,
+            game_file_metadata: game_metadata,
+            cover_image_metadata: cover_metadata,
         };
         
         let game_id = object::id(&game);
@@ -173,6 +217,24 @@ module game_store::game_store {
             game.genre,
             game.is_active,
             game.total_sales
+        )
+    }
+
+    public fun get_game_file_metadata(game: &Game): (String, u64, String, u64) {
+        (
+            game.game_file_metadata.original_filename,
+            game.game_file_metadata.file_size,
+            game.game_file_metadata.content_type,
+            game.game_file_metadata.upload_timestamp
+        )
+    }
+
+    public fun get_cover_image_metadata(game: &Game): (String, u64, String, u64) {
+        (
+            game.cover_image_metadata.original_filename,
+            game.cover_image_metadata.file_size,
+            game.cover_image_metadata.content_type,
+            game.cover_image_metadata.upload_timestamp
         )
     }
 

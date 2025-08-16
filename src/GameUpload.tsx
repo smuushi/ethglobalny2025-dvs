@@ -52,6 +52,8 @@ export function GameUpload() {
     isUploading: boolean;
     error?: string;
     success?: boolean;
+    details?: string;
+    retryAttempt?: number;
   }>({
     step: "Ready to upload",
     progress: 0,
@@ -61,12 +63,28 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-  // Initialize Walrus client with WASM URL for Vite
-  const walrusClient = new WalrusClient({
-    network: "testnet",
-    suiClient,
-    wasmUrl: walrusWasmUrl,
-  });
+  // Initialize Walrus client using the experimental extension pattern
+  const walrusClient = suiClient.$extend(
+    WalrusClient.experimental_asClientExtension({
+      network: "testnet",
+      wasmUrl: walrusWasmUrl,
+      storageNodeClientOptions: {
+        timeout: 60_000,
+        onError: (error: Error) => {
+          console.error(`🚨 Walrus Storage Node Error:`, {
+            error: error.message || error,
+            timestamp: new Date().toISOString(),
+          });
+        },
+      },
+      uploadRelay: {
+        host: "https://upload-relay.testnet.walrus.space",
+        sendTip: {
+          max: 1_000,
+        },
+      },
+    }),
+  );
 
   // Helper function to get the correct file extension based on MIME type
   const getFileExtension = (file: File): string => {
@@ -148,22 +166,38 @@ export function GameUpload() {
   const uploadToWalrus = async (
     file: File,
     identifier: string,
-  ): Promise<string> => {
+    retryCount: number = 0,
+  ): Promise<{ blobId: string; actualSize: number }> => {
     if (!currentAccount) {
       throw new Error("Wallet not connected");
     }
 
+    const maxRetries = 3;
+    const isRetry = retryCount > 0;
+
     try {
       console.log(
-        `🚀 Starting Walrus upload: ${identifier} (${file.size} bytes)`,
+        `🚀 ${isRetry ? `[Retry ${retryCount}/${maxRetries}] ` : ""}Starting Walrus upload: ${identifier} (${file.size} bytes)`,
       );
 
-      // Convert file to Uint8Array
-      const fileData = new Uint8Array(await file.arrayBuffer());
+      // Use File directly as Blob - no conversion needed to avoid corruption
+      console.log(`🔬 File integrity check:`, {
+        identifier,
+        fileSize: file.size,
+        fileType: file.type,
+        fileName: file.name,
+        lastModified: file.lastModified,
+      });
 
       // Use file-type library to validate and detect actual format
-      const fileType = await fileTypeFromBuffer(fileData);
-      console.log(`🔍 Detected file type for upload:`, fileType);
+      const fileBuffer = await file.arrayBuffer();
+      const fileType = await fileTypeFromBuffer(new Uint8Array(fileBuffer));
+      console.log(`🔍 Detected file type for upload:`, {
+        identifier,
+        fileType,
+        originalType: file.type,
+        size: file.size,
+      });
 
       let actualMimeType = file.type || "application/octet-stream";
       if (fileType) {
@@ -201,31 +235,30 @@ export function GameUpload() {
         }
       }
 
-      // Create WalrusFile with detected metadata
+      // Minimal WalrusFile creation - remove all tags to test
       const walrusFile = WalrusFile.from({
-        contents: fileData,
-        identifier,
-        tags: {
-          "content-type": actualMimeType,
-          "upload-source": "coldcache",
-          "game-file": identifier.includes(".zip") ? "true" : "false",
-          "cover-image": identifier.includes("_cover") ? "true" : "false",
-          "detected-type": fileType ? fileType.ext : "unknown",
-          "original-name": file.name,
-        },
+        contents: file, // Use File directly (extends Blob)
+        identifier: file.name,
       });
 
-      console.log(
-        `📦 Created WalrusFile for ${identifier} with type ${actualMimeType}`,
-      );
+      console.log(`📦 Created minimal WalrusFile for ${file.name}`, {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+      });
 
-      // Use the browser-compatible flow for wallet signing
-      const flow = walrusClient.writeFilesFlow({
+      // Use writeFilesFlow for browser wallet compatibility
+      console.log(`🔄 Starting Walrus upload flow...`);
+      const uploadStart = Date.now();
+
+      const flow = walrusClient.walrus.writeFilesFlow({
         files: [walrusFile],
       });
 
-      console.log(`🔄 Encoding file...`);
+      console.log(`📁 Encoding file for upload...`);
+      console.log(`🔬 Before encoding - original file size: ${file.size}`);
       await flow.encode();
+      console.log(`✅ Encoding completed - checking for any changes...`);
 
       console.log(`📝 Creating register transaction...`);
       const registerTx = flow.register({
@@ -284,14 +317,61 @@ export function GameUpload() {
         throw new Error("No files were uploaded successfully");
       }
 
-      const blobId = files[0].blobId;
-      console.log(`🎉 Walrus upload complete! Blob ID: ${blobId}`);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
+      console.log(`🔍 Files uploaded:`, files);
 
-      return blobId;
+      const blobId = files[0].blobId;
+
+      console.log(`✅ Upload completed in ${Date.now() - uploadStart}ms`, {
+        blobId,
+        identifier,
+        retryCount,
+      });
+      console.log(`🎉 Walrus upload complete!`, {
+        blobId,
+        identifier,
+        retryCount,
+        fileSize: file.size,
+      });
+
+      return { blobId, actualSize: file.size };
     } catch (error) {
-      console.error(`💥 Walrus upload error for ${identifier}:`, error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error(`💥 Walrus upload error for ${identifier}:`, {
+        error: errorMessage,
+        retryCount,
+        identifier,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Check if this is a retryable error and we haven't exceeded max retries
+      const isRetryableError =
+        errorMessage.includes("400") ||
+        errorMessage.includes("Bad Request") ||
+        errorMessage.includes("network") ||
+        errorMessage.includes("timeout");
+
+      if (isRetryableError && retryCount < maxRetries) {
+        console.log(
+          `🔄 Retrying upload for ${identifier} (attempt ${retryCount + 1}/${maxRetries + 1})`,
+        );
+        // Wait a bit before retrying
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1000 * (retryCount + 1)),
+        );
+        return uploadToWalrus(file, identifier, retryCount + 1);
+      }
+
       throw new Error(
-        `Failed to upload ${identifier}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Failed to upload ${identifier} after ${retryCount + 1} attempts: ${errorMessage}`,
       );
     }
   };
@@ -322,6 +402,7 @@ export function GameUpload() {
         step: "Step 1/4: Uploading game file to Walrus storage...",
         progress: 25,
         isUploading: true,
+        details: "Preparing game file for upload",
       });
 
       // Upload game file to Walrus
@@ -330,15 +411,20 @@ export function GameUpload() {
         `🎮 Game file: ${metadata.gameFile.name} (${metadata.gameFile.type}) -> ${gameExtension}`,
       );
 
-      const gameWalrusId = await uploadToWalrus(
+      const gameUploadResult = await uploadToWalrus(
         metadata.gameFile,
         `${metadata.title}${gameExtension}`,
       );
+      const gameWalrusId = gameUploadResult.blobId;
+      const actualGameFileSize = gameUploadResult.actualSize;
 
       setUploadProgress({
         step: "Step 2/4: Uploading cover image to Walrus...",
         progress: 50,
         isUploading: true,
+        details: metadata.coverImage
+          ? "Uploading cover image"
+          : "Skipping cover image",
       });
 
       // Upload cover image to Walrus (or use placeholder)
@@ -350,10 +436,11 @@ export function GameUpload() {
           `📸 Cover image: ${metadata.coverImage.name} (${metadata.coverImage.type}) -> ${coverExtension}`,
         );
 
-        coverImageWalrusId = await uploadToWalrus(
+        const coverUploadResult = await uploadToWalrus(
           metadata.coverImage,
           `${metadata.title}_cover${coverExtension}`,
         );
+        coverImageWalrusId = coverUploadResult.blobId;
       }
 
       setUploadProgress({
@@ -362,8 +449,31 @@ export function GameUpload() {
         isUploading: true,
       });
 
-      // Register game on Sui blockchain
+      // Register game on Sui blockchain with metadata
       const tx = new Transaction();
+
+      // Prepare metadata for the contract
+      const gameFileName = metadata.gameFile.name;
+      const gameContentType =
+        metadata.gameFile.type || "application/octet-stream";
+
+      const coverFileName = metadata.coverImage?.name || "";
+      const coverFileSize = metadata.coverImage?.size || 0;
+      const coverContentType = metadata.coverImage?.type || "image/jpeg";
+
+      console.log(`📋 Uploading metadata to contract:`, {
+        gameFile: {
+          name: gameFileName,
+          originalSize: metadata.gameFile.size,
+          actualUploadedSize: actualGameFileSize,
+          type: gameContentType,
+        },
+        coverImage: {
+          name: coverFileName,
+          size: coverFileSize,
+          type: coverContentType,
+        },
+      });
 
       tx.moveCall({
         target: `${gameStorePackageId}::game_store::publish_game`,
@@ -389,6 +499,26 @@ export function GameUpload() {
           tx.pure.vector(
             "u8",
             Array.from(new TextEncoder().encode(metadata.genre)),
+          ),
+          // Game file metadata
+          tx.pure.vector(
+            "u8",
+            Array.from(new TextEncoder().encode(gameFileName)),
+          ),
+          tx.pure.u64(actualGameFileSize),
+          tx.pure.vector(
+            "u8",
+            Array.from(new TextEncoder().encode(gameContentType)),
+          ),
+          // Cover image metadata
+          tx.pure.vector(
+            "u8",
+            Array.from(new TextEncoder().encode(coverFileName)),
+          ),
+          tx.pure.u64(coverFileSize),
+          tx.pure.vector(
+            "u8",
+            Array.from(new TextEncoder().encode(coverContentType)),
           ),
         ],
       });
@@ -423,12 +553,37 @@ export function GameUpload() {
         },
       );
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("🚨 Game upload failed:", error);
+
+      // Provide more user-friendly error messages
+      let userFriendlyMessage = errorMessage;
+      if (
+        errorMessage.includes("400") ||
+        errorMessage.includes("Bad Request")
+      ) {
+        userFriendlyMessage =
+          "Storage nodes are having issues. This is usually temporary - please try again in a few minutes.";
+      } else if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("timeout")
+      ) {
+        userFriendlyMessage =
+          "Network connection issue. Please check your internet and try again.";
+      } else if (errorMessage.includes("Wallet not connected")) {
+        userFriendlyMessage = "Please connect your wallet and try again.";
+      } else if (errorMessage.includes("rejected")) {
+        userFriendlyMessage =
+          "Transaction was rejected. Please try again and approve the transaction.";
+      }
+
       setUploadProgress({
         step: "Upload failed",
         progress: 0,
         isUploading: false,
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        error: userFriendlyMessage,
+        details: `Technical details: ${errorMessage}`,
       });
     }
   };
@@ -569,24 +724,51 @@ export function GameUpload() {
           uploadProgress.error ||
           uploadProgress.success) && (
           <Box>
-            <Text size="2" weight="medium" mb="2">
-              {uploadProgress.step}
-            </Text>
-            {uploadProgress.isUploading && (
-              <Progress value={uploadProgress.progress} />
-            )}
-            {uploadProgress.error && (
-              <Callout.Root color="red" size="1">
-                <Callout.Text>{uploadProgress.error}</Callout.Text>
-              </Callout.Root>
-            )}
-            {uploadProgress.success && (
-              <Callout.Root color="green" size="1">
-                <Callout.Text>
-                  🎉 Your game has been published successfully!
-                </Callout.Text>
-              </Callout.Root>
-            )}
+            <Flex direction="column" gap="2">
+              <Text size="2" weight="medium">
+                {uploadProgress.step}
+                {uploadProgress.retryAttempt && (
+                  <Text size="1" color="gray" ml="2">
+                    (Retry attempt {uploadProgress.retryAttempt})
+                  </Text>
+                )}
+              </Text>
+
+              {uploadProgress.details && (
+                <Text size="1" color="gray">
+                  {uploadProgress.details}
+                </Text>
+              )}
+
+              {uploadProgress.isUploading && (
+                <Progress value={uploadProgress.progress} />
+              )}
+
+              {uploadProgress.error && (
+                <Callout.Root color="red" size="1">
+                  <Callout.Text>{uploadProgress.error}</Callout.Text>
+                  {uploadProgress.details &&
+                    uploadProgress.details.startsWith("Technical") && (
+                      <Text
+                        size="1"
+                        color="gray"
+                        mt="1"
+                        style={{ fontFamily: "monospace", fontSize: "11px" }}
+                      >
+                        {uploadProgress.details}
+                      </Text>
+                    )}
+                </Callout.Root>
+              )}
+
+              {uploadProgress.success && (
+                <Callout.Root color="green" size="1">
+                  <Callout.Text>
+                    🎉 Your game has been published successfully!
+                  </Callout.Text>
+                </Callout.Root>
+              )}
+            </Flex>
           </Box>
         )}
 

@@ -21,6 +21,13 @@ import {
 } from "@radix-ui/themes";
 import { useNetworkVariable } from "./networkConfig";
 
+interface GameFileMetadata {
+  original_filename: string;
+  file_size: number;
+  content_type: string;
+  upload_timestamp: number;
+}
+
 interface Game {
   id: string;
   title: string;
@@ -33,6 +40,9 @@ interface Game {
   publish_date: number;
   is_active: boolean;
   total_sales: number;
+  // Enhanced metadata
+  game_file_metadata?: GameFileMetadata;
+  cover_image_metadata?: GameFileMetadata;
 }
 
 export function Store() {
@@ -42,16 +52,60 @@ export function Store() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Initialize Walrus client for reading cover images
-  const walrusClient = new WalrusClient({
-    network: "testnet",
-    suiClient,
-    wasmUrl: walrusWasmUrl,
-    // Note: SSL certificate issues with testnet nodes are handled in error catching
-  });
+  // Initialize Walrus client using the experimental extension pattern
+  const walrusClient = suiClient.$extend(
+    WalrusClient.experimental_asClientExtension({
+      network: "testnet",
+      wasmUrl: walrusWasmUrl,
+      storageNodeClientOptions: {
+        timeout: 60_000,
+      },
+      uploadRelay: {
+        host: "https://upload-relay.testnet.walrus.space",
+        sendTip: {
+          max: 1_000,
+        },
+      },
+    }),
+  );
+
+  // Debug function to analyze blob metadata
+  const debugBlobMetadata = async (blobId: string, fileType: string) => {
+    console.log(`🔬 [DEBUG] Analyzing ${fileType} blob: ${blobId}`);
+    try {
+      const files = await walrusClient.walrus.getFiles({ ids: [blobId] });
+      if (files.length === 0) {
+        console.log(`❌ [DEBUG] No files found for blob ID: ${blobId}`);
+        return;
+      }
+
+      const walrusFile = files[0];
+      const identifier = await walrusFile.getIdentifier();
+      const tags = await walrusFile.getTags();
+      const bytes = await walrusFile.bytes();
+
+      console.log(`🔬 [DEBUG] ${fileType} analysis:`, {
+        blobId,
+        identifier,
+        tags,
+        byteLength: bytes.length,
+        header: Array.from(bytes.slice(0, 16))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join(""),
+      });
+
+      return { identifier, tags, byteLength: bytes.length };
+    } catch (error) {
+      console.error(`❌ [DEBUG] Failed to analyze ${fileType} blob:`, error);
+    }
+  };
 
   // Function to download cover image directly
-  const downloadCoverImage = async (blobId: string, gameTitle: string) => {
+  const downloadCoverImage = async (
+    blobId: string,
+    gameTitle: string,
+    game?: Game,
+  ) => {
     console.log(
       `📥 Starting cover image download for blob ID: "${blobId}", game: "${gameTitle}"`,
     );
@@ -67,7 +121,7 @@ export function Store() {
       console.log(`📡 Fetching cover image from Walrus for blob ID: ${blobId}`);
 
       // Use Walrus client to get the file
-      const files = await walrusClient.getFiles({ ids: [blobId] });
+      const files = await walrusClient.walrus.getFiles({ ids: [blobId] });
       console.log(
         `📦 Downloaded ${files.length} cover image file(s) from Walrus`,
       );
@@ -77,6 +131,8 @@ export function Store() {
       }
 
       const walrusFile = files[0];
+
+      // Get file data from Walrus
       const imageBytes = await walrusFile.bytes();
       console.log(`📏 Downloaded ${imageBytes.length} bytes for cover image`);
 
@@ -84,30 +140,70 @@ export function Store() {
         throw new Error(`Empty bytes received for blob ID: ${blobId}`);
       }
 
-      // Use file-type library for robust image format detection
-      console.log(
-        `🔍 Analyzing ${imageBytes.length} bytes of cover image with file-type library...`,
-      );
+      // Use metadata from contract first, then fall back to detection
+      let mimeType: string;
+      let fileExtension: string;
+      let originalFileName: string | undefined;
 
-      const fileType = await fileTypeFromBuffer(imageBytes);
+      if (game?.cover_image_metadata) {
+        // Use metadata from the GameStore contract
+        const metadata = game.cover_image_metadata;
+        mimeType = metadata.content_type;
+        originalFileName = metadata.original_filename;
+        fileExtension = originalFileName.includes(".")
+          ? "." + originalFileName.split(".").pop()
+          : ".jpg";
 
-      if (!fileType) {
-        console.log(`⚠️ Could not detect image type, defaulting to JPEG`);
-        var mimeType = "image/jpeg";
-        var fileExtension = ".jpg";
+        console.log(`✅ Using contract metadata:`, {
+          contentType: mimeType,
+          originalFilename: originalFileName,
+          fileSize: metadata.file_size,
+          uploadTimestamp: metadata.upload_timestamp,
+        });
+
+        // Verify file size matches
+        if (metadata.file_size !== imageBytes.length) {
+          console.warn(
+            `⚠️ Size mismatch! Contract: ${metadata.file_size}, Downloaded: ${imageBytes.length}`,
+          );
+        } else {
+          console.log(`✅ File size verified: ${imageBytes.length} bytes`);
+        }
       } else {
-        console.log(`✅ Detected cover image type:`, fileType);
-        mimeType = fileType.mime;
-        fileExtension = `.${fileType.ext}`;
+        console.log(
+          `⚠️ No contract metadata available, falling back to detection`,
+        );
 
-        // Validate it's actually an image
-        if (!mimeType.startsWith("image/")) {
-          console.log(
-            `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
+        // Log first 32 bytes for debugging
+        const header = Array.from(
+          imageBytes.slice(0, Math.min(32, imageBytes.length)),
+        )
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        console.log(
+          `🔍 Cover image header (${Math.min(32, imageBytes.length)} bytes): ${header}`,
+        );
+
+        const fileType = await fileTypeFromBuffer(imageBytes);
+        if (!fileType) {
+          console.warn(
+            `❌ Could not detect cover image file type! Header: ${header}`,
           );
           mimeType = "image/jpeg";
           fileExtension = ".jpg";
+        } else {
+          mimeType = fileType.mime;
+          fileExtension = `.${fileType.ext}`;
         }
+      }
+
+      // Validate it's actually an image
+      if (!mimeType.startsWith("image/")) {
+        console.log(
+          `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
+        );
+        mimeType = "image/jpeg";
+        fileExtension = ".jpg";
       }
 
       // Create downloadable blob with correct MIME type
@@ -116,11 +212,24 @@ export function Store() {
       );
       const imageBlob = new Blob([Uint8Array.from(imageBytes)], { type: mimeType });
 
+      // Create filename using contract metadata when possible
+      let fileName: string;
+      if (originalFileName) {
+        fileName = originalFileName.replace(/[<>:"/\\|?*]/g, "_");
+        console.log(`💾 Using original cover image filename: ${fileName}`);
+      } else {
+        fileName = `${gameTitle}_cover${fileExtension}`.replace(
+          /[<>:"/\\|?*]/g,
+          "_",
+        );
+        console.log(`💾 Using constructed cover filename: ${fileName}`);
+      }
+
       // Create download link with correct extension
       const downloadUrl = URL.createObjectURL(imageBlob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${gameTitle}_cover${fileExtension}`;
+      link.download = fileName;
 
       // Trigger download
       document.body.appendChild(link);
@@ -153,8 +262,12 @@ export function Store() {
     }
   };
 
-  // Function to download game file directly
-  const downloadGameFile = async (blobId: string, gameTitle: string) => {
+  // Function to download game file directly with enhanced metadata handling
+  const downloadGameFile = async (
+    blobId: string,
+    gameTitle: string,
+    game?: Game,
+  ) => {
     console.log(
       `🎮 Starting game file download for blob ID: "${blobId}", game: "${gameTitle}"`,
     );
@@ -170,7 +283,7 @@ export function Store() {
       console.log(`📡 Fetching game file from Walrus for blob ID: ${blobId}`);
 
       // Use Walrus client to get the file
-      const files = await walrusClient.getFiles({ ids: [blobId] });
+      const files = await walrusClient.walrus.getFiles({ ids: [blobId] });
       console.log(`📦 Downloaded ${files.length} game file(s) from Walrus`);
 
       if (files.length === 0) {
@@ -178,6 +291,8 @@ export function Store() {
       }
 
       const walrusFile = files[0];
+
+      // Get file data from Walrus
       const gameBytes = await walrusFile.bytes();
       console.log(`📏 Downloaded ${gameBytes.length} bytes for game file`);
 
@@ -185,36 +300,58 @@ export function Store() {
         throw new Error(`Empty bytes received for game blob ID: ${blobId}`);
       }
 
-      // Use file-type library for robust format detection
-      console.log(
-        `🔍 Analyzing ${gameBytes.length} bytes with file-type library...`,
-      );
+      // Use metadata from contract first, then fall back to detection
+      let mimeType: string;
+      let fileExtension: string;
+      let originalName: string | undefined;
 
-      // Log first 16 bytes for debugging
-      const header = Array.from(
-        gameBytes.slice(0, Math.min(16, gameBytes.length)),
-      )
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      console.log(
-        `🔍 File header (${Math.min(16, gameBytes.length)} bytes): ${header}`,
-      );
+      if (game?.game_file_metadata) {
+        // Use metadata from the GameStore contract
+        const metadata = game.game_file_metadata;
+        mimeType = metadata.content_type;
+        originalName = metadata.original_filename;
+        fileExtension = originalName.includes(".")
+          ? "." + originalName.split(".").pop()
+          : ".bin";
 
-      // Use file-type library to detect format
-      const fileType = await fileTypeFromBuffer(gameBytes);
+        console.log(`✅ Using contract metadata:`, {
+          contentType: mimeType,
+          originalFilename: originalName,
+          fileSize: metadata.file_size,
+          uploadTimestamp: metadata.upload_timestamp,
+        });
 
-      if (!fileType) {
-        throw new Error(
-          `❌ Could not detect file type! Header: ${header}. File might be corrupted or in an unsupported format.`,
+        // Verify file size matches
+        if (metadata.file_size !== gameBytes.length) {
+          console.warn(
+            `⚠️ Size mismatch! Contract: ${metadata.file_size}, Downloaded: ${gameBytes.length}`,
+          );
+        } else {
+          console.log(`✅ File size verified: ${gameBytes.length} bytes`);
+        }
+      } else {
+        console.log(
+          `⚠️ No contract metadata available, falling back to detection`,
         );
+
+        const fileType = await fileTypeFromBuffer(gameBytes);
+        if (!fileType) {
+          const header = Array.from(
+            gameBytes.slice(0, Math.min(32, gameBytes.length)),
+          )
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          console.warn(
+            `❌ Could not detect file type! Header: ${header}. File might be corrupted or in unknown format.`,
+          );
+          mimeType = "application/octet-stream";
+          fileExtension = ".bin";
+        } else {
+          mimeType = fileType.mime;
+          fileExtension = `.${fileType.ext}`;
+          console.log(`🔍 Detected MIME type: ${mimeType}`);
+        }
       }
-
-      console.log(`✅ Detected file type:`, fileType);
-      console.log(`📁 MIME type: ${fileType.mime}`);
-      console.log(`📁 Extension: .${fileType.ext}`);
-
-      const mimeType = fileType.mime;
-      const fileExtension = `.${fileType.ext}`;
 
       // Validate that it's a reasonable format for a game file
       const gameFileFormats = [
@@ -255,11 +392,26 @@ export function Store() {
       );
       const gameBlob = new Blob([Uint8Array.from(gameBytes)], { type: mimeType });
 
+      // Create filename using stored metadata when possible
+      let fileName: string;
+      if (originalName) {
+        // Use original filename, but sanitize it
+        fileName = originalName.replace(/[<>:"/\\|?*]/g, "_");
+        console.log(`💾 Using original filename: ${fileName}`);
+      } else {
+        // Fallback to constructed filename
+        fileName = `${gameTitle}_game${fileExtension}`.replace(
+          /[<>:"/\\|?*]/g,
+          "_",
+        );
+        console.log(`💾 Using constructed filename: ${fileName}`);
+      }
+
       // Create download link with correct extension
       const downloadUrl = URL.createObjectURL(gameBlob);
       const link = document.createElement("a");
       link.href = downloadUrl;
-      link.download = `${gameTitle}_game${fileExtension}`;
+      link.download = fileName;
 
       // Trigger download
       document.body.appendChild(link);
@@ -270,6 +422,16 @@ export function Store() {
       URL.revokeObjectURL(downloadUrl);
 
       console.log(`✅ Successfully downloaded game file for "${gameTitle}"`);
+
+      // Enhanced download confirmation with metadata
+      const sizeInMB = (gameBytes.length / 1024 / 1024).toFixed(1);
+      let confirmationMessage = `🎮 Game "${gameTitle}" download started!\n\nFile: ${fileName}\nSize: ${sizeInMB} MB\nType: ${mimeType}`;
+
+      if (originalName && originalName !== fileName) {
+        confirmationMessage += `\nOriginal name: ${originalName}`;
+      }
+
+      alert(confirmationMessage);
     } catch (error) {
       console.error(
         `❌ Failed to download game file for "${gameTitle}":`,
@@ -409,6 +571,27 @@ export function Store() {
           const fields = content.fields;
           console.log(`🔧 Fields for object ${index}:`, fields);
 
+          // Helper function to extract metadata
+          const extractMetadata = (
+            metadataField: any,
+          ): GameFileMetadata | undefined => {
+            if (!metadataField || !metadataField.fields) return undefined;
+
+            const meta = metadataField.fields;
+            return {
+              original_filename: Array.isArray(meta.original_filename)
+                ? new TextDecoder().decode(
+                    new Uint8Array(meta.original_filename),
+                  )
+                : meta.original_filename || "",
+              file_size: parseInt(meta.file_size) || 0,
+              content_type: Array.isArray(meta.content_type)
+                ? new TextDecoder().decode(new Uint8Array(meta.content_type))
+                : meta.content_type || "",
+              upload_timestamp: parseInt(meta.upload_timestamp) || 0,
+            };
+          };
+
           const game = {
             id: obj.data.objectId,
             title: Array.isArray(fields.title)
@@ -433,9 +616,16 @@ export function Store() {
             publish_date: parseInt(fields.publish_date) || 0,
             is_active: fields.is_active || false,
             total_sales: parseInt(fields.total_sales) || 0,
+            // Extract metadata if available (for new games with metadata)
+            game_file_metadata: extractMetadata(fields.game_file_metadata),
+            cover_image_metadata: extractMetadata(fields.cover_image_metadata),
           };
 
-          console.log(`✅ Processed game ${index}:`, game);
+          console.log(`✅ Processed game ${index} with metadata:`, {
+            ...game,
+            hasGameMetadata: !!game.game_file_metadata,
+            hasCoverMetadata: !!game.cover_image_metadata,
+          });
           return game;
         })
         .filter(Boolean);
@@ -643,7 +833,11 @@ export function Store() {
                   size="1"
                   variant="soft"
                   onClick={() =>
-                    downloadCoverImage(game.cover_image_blob_id, game.title)
+                    downloadCoverImage(
+                      game.cover_image_blob_id,
+                      game.title,
+                      game,
+                    )
                   }
                   style={{
                     background: "rgba(255, 255, 255, 0.2)",
@@ -672,7 +866,7 @@ export function Store() {
                   size="1"
                   variant="soft"
                   onClick={() =>
-                    downloadGameFile(game.walrus_blob_id, game.title)
+                    downloadGameFile(game.walrus_blob_id, game.title, game)
                   }
                   style={{
                     background: "rgba(255, 255, 255, 0.15)",
