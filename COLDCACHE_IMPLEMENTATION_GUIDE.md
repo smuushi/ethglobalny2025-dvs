@@ -47,9 +47,9 @@ rights. Built on Sui blockchain with Walrus storage integration.
 **Key Components:**
 
 - **Sui Move Contracts**: NFT ownership and game registry
-- **Walrus Storage**: Decentralized storage for encrypted game files
+- **Walrus Storage**: Decentralized storage for game files with CDN access
 - **Seal Encryption**: Token-gated access control with real-time verification
-- **Tusky SDK**: Simplified Walrus integration
+- **Walrus SDK**: Direct integration with @mysten/walrus
 - **Real-time Verification**: Every download checks current NFT ownership
 
 ## Current Project Structure Analysis
@@ -129,46 +129,42 @@ const handlePurchase = (gameId: string, price: string) => {
 
 **Key TODOs**:
 
-- [ ] Query owned game NFTs from Sui
-- [ ] Implement real-time NFT ownership verification
+- [x] Query owned game NFTs from Sui
+- [x] Implement real-time NFT ownership verification
+- [x] Implement download progress tracking
+- [x] Direct Walrus CDN downloads using QuiltPatchId
 - [ ] Integrate Seal for token-gated decryption
-- [ ] Integrate Tusky SDK for encrypted file downloads from Walrus
-- [ ] Implement download progress tracking
 - [ ] Add game transfer/gift functionality
 
-**Sui + Walrus Integration**:
+**Sui + Walrus + Seal Integration**:
 
 ```typescript
 const downloadGame = async (game: OwnedGame) => {
-  // 1. Verify NFT ownership on Sui (your current pattern)
-  const { data: ownedObjects } = await suiClient.getOwnedObjects({
-    owner: currentAccount?.address,
-    filter: { StructType: `${gameStorePackageId}::game_store::GameNFT` },
-  });
-
-  const ownsGame = ownedObjects.data.some(
-    (obj) => obj.data?.content?.fields?.game_id === game.gameId,
+  // 1. Verify NFT ownership on Sui (implemented in GameDownloadManager)
+  const downloadManager = new GameDownloadManager(
+    suiClient,
+    currentAccount.address,
   );
 
-  if (!ownsGame) {
-    throw new Error("Game ownership verification failed");
-  }
-
-  // 2. Download encrypted game from Walrus
-  const tusky = new Tusky({
-    apiKey: process.env.VITE_TUSKY_API_KEY,
-  });
-  const encryptedGame = await tusky.file.arrayBuffer(game.walrusId);
-
-  // 3. Use Seal for token-gated decryption
-  const gameFile = await seal.decrypt(encryptedGame, {
-    policyId: game.sealPolicyId,
-    userAddress: currentAccount?.address,
+  // 2. Download game file from Walrus CDN
+  const gameBlob = await downloadManager.downloadGame(game, (progress) => {
+    setDownloadProgress({
+      stage: progress.stage,
+      progress: progress.progress,
+      message: progress.message,
+    });
   });
 
-  // 4. Provide download to user
-  downloadBlob(gameFile, `${game.title}.zip`);
+  // 3. Trigger browser download
+  const filename = `${game.title.replace(/[^a-zA-Z0-9]/g, "_")}.zip`;
+  GameDownloadManager.triggerDownload(gameBlob, filename);
 };
+
+// GameDownloadManager handles:
+// - NFT ownership verification via Sui queries
+// - Direct Walrus CDN download using QuiltPatchId
+// - Future Seal decryption integration
+// - Progress tracking and error handling
 ```
 
 ### 3. Publisher Portal - Game Upload and Registration
@@ -177,51 +173,76 @@ const downloadGame = async (game: OwnedGame) => {
 
 **Key TODOs**:
 
-- [ ] Create Seal NFT-based access policies
-- [ ] Encrypt game files with Seal before upload
-- [ ] Upload encrypted games to Walrus using Tusky SDK
-- [ ] Register games on Sui Move contract with Seal policy
-- [ ] Handle metadata (cover images, descriptions)
+- [x] Upload games to Walrus using @mysten/walrus WalrusFile
+- [x] Register games on Sui Move contract with rich metadata
+- [x] Handle metadata (cover images, descriptions, genres)
+- [ ] Integrate Seal NFT-based access policies for encryption
 - [ ] Publisher analytics and earnings tracking
 
-**Sui Upload Flow**:
+**Current Walrus Upload Flow** (implemented in GameUpload.tsx):
 
 ```typescript
 const publishGame = async (gameFile: File, metadata: GameMetadata) => {
-  // 1. Create Seal NFT-based access policy
-  const sealPolicy = await seal.createPolicy({
-    name: `ColdCache Game: ${metadata.title}`,
-    type: "nft_ownership",
-    contract: gameStorePackageId,
-    network: "sui",
-    verificationFunction: "verify_game_ownership",
+  // 1. Upload game file to Walrus using WalrusFile
+  const walrusFile = WalrusFile.from({
+    contents: new Uint8Array(await gameFile.arrayBuffer()),
+    identifier: gameFile.name,
+    tags: { contentType: gameFile.type },
   });
 
-  // 2. Encrypt game with Seal policy
-  const encryptedGame = await seal.encrypt(gameFile, sealPolicy.id);
+  const flow = walrusClient.writeFilesFlow({ files: [walrusFile] });
+  await flow.encode();
 
-  // 3. Upload encrypted game to Walrus
-  const tusky = new Tusky({ apiKey: process.env.VITE_TUSKY_API_KEY });
-  const vaultId = await tusky.vault.create(`Game: ${metadata.title}`);
-  const walrusId = await tusky.file.upload(vaultId, encryptedGame);
+  // Register and upload to storage nodes
+  const registerTx = flow.register({
+    epochs: 5,
+    owner: currentAccount.address,
+  });
+  const registerResult = await signAndExecute({ transaction: registerTx });
+  await flow.upload({ digest: registerResult.digest });
 
-  // 4. Register on Sui contract (following your transaction pattern)
+  // Certify the upload
+  const certifyTx = flow.certify();
+  await signAndExecute({ transaction: certifyTx });
+
+  const files = await flow.listFiles();
+  const patchId = files[0].id; // QuiltPatchId for CDN downloads
+
+  // 2. Register on Sui contract with all metadata
   const tx = new Transaction();
-
   tx.moveCall({
-    target: `${gameStorePackageId}::game_store::publish_game`,
+    target: `${gameStorePackageId}::game_store::publish_game_entry`,
     arguments: [
-      tx.pure.string(metadata.title),
-      tx.pure.string(metadata.description),
-      tx.pure.u64(parseFloat(metadata.price) * 1000000000), // Convert to MIST
-      tx.pure.string(walrusId),
-      tx.pure.string(sealPolicy.id),
-      tx.pure.string(metadata.genre),
+      tx.object(gameStoreObjectId),
+      tx.pure.vector(
+        "u8",
+        Array.from(new TextEncoder().encode(metadata.title)),
+      ),
+      tx.pure.vector(
+        "u8",
+        Array.from(new TextEncoder().encode(metadata.description)),
+      ),
+      tx.pure.u64(Math.floor(parseFloat(metadata.price) * 1000000000)),
+      tx.pure.vector("u8", Array.from(new TextEncoder().encode(patchId))), // Walrus QuiltPatchId
+      tx.pure.vector(
+        "u8",
+        Array.from(new TextEncoder().encode(coverImagePatchId)),
+      ),
+      tx.pure.vector(
+        "u8",
+        Array.from(new TextEncoder().encode(metadata.genre)),
+      ),
+      // Additional file metadata...
     ],
   });
 
   signAndExecute({ transaction: tx });
 };
+
+// Future Seal Integration:
+// 3. Create Seal policy for token-gated access
+// 4. Encrypt game file before Walrus upload
+// 5. Store Seal policy ID in NFT for decryption verification
 ```
 
 ## Move Smart Contract Implementation
@@ -366,7 +387,8 @@ Your current dependencies are perfect:
 ```json
 {
   "@mysten/seal": "latest",
-  "@tusky-io/ts-sdk": "latest"
+  "@mysten/walrus": "latest",
+  "zod": "latest"
 }
 ```
 
@@ -394,20 +416,22 @@ Update your current `App.tsx` to include ColdCache branding and navigation:
 
 ### 3. Environment Configuration
 
-Update your environment with:
+Current configuration in `constants.ts`:
 
-```bash
-# Seal configuration for token-gated encryption
-VITE_SEAL_NETWORK=testnet
-VITE_SEAL_KEY_SERVERS=https://seal1.mystenlabs.com,https://seal2.mystenlabs.com
+```typescript
+// NFT Package IDs
+export const TESTNET_NFT_PACKAGE_ID =
+  "0x269789a9a66ea57fda7bcb252d355721369c2c8f51dc2f25241e8c279d7741c9";
 
-# Walrus configuration (uses your existing Sui client)
-VITE_WALRUS_NETWORK=testnet
+// Game Store Package IDs
+export const TESTNET_GAME_STORE_PACKAGE_ID =
+  "0xf60ca46485ace696e38d266842b48601141d54cfbe12d7b5d89cdd5fbdf4c16e";
+export const TESTNET_GAME_STORE_OBJECT_ID =
+  "0xaffca1f48b35b46f3897940a8db3a0bff7f645c053c4995503b9c53461f1c461";
 
-# Game Store Package IDs (add to constants.ts)
-VITE_DEVNET_GAME_STORE_PACKAGE_ID=0xTODO
-VITE_TESTNET_GAME_STORE_PACKAGE_ID=0xTODO
-VITE_MAINNET_GAME_STORE_PACKAGE_ID=0xTODO
+// Future Seal configuration
+// VITE_SEAL_NETWORK=testnet
+// VITE_SEAL_KEY_SERVERS=https://seal1.mystenlabs.com,https://seal2.mystenlabs.com
 ```
 
 ## Development Roadmap
@@ -470,7 +494,11 @@ VITE_MAINNET_GAME_STORE_PACKAGE_ID=0xTODO
 
 1. **Purchase Modal**: 3-step mint flow (Amount → Confirm → Status)
 2. **Game Transfers**: NFT transfer UI for resale/gifting
-3. **Seal Integration**: Token-gated encryption (when @mysten/seal is available)
+3. **Seal Integration**: Token-gated encryption
+   - ✅ Seal package installed (@mysten/seal v0.4.21)
+   - ✅ Seal service class created (`src/lib/seal.ts`)
+   - ✅ Upload/download placeholders prepared
+   - ⏳ Implement actual Seal encryption/decryption
 
 ### 🏗️ Architecture Achievements:
 
@@ -493,26 +521,27 @@ decentralized storage!** 🎮
 
 ## Quick Next Steps
 
-1. **Add dependencies**:
+1. **Add dependencies** (already completed):
 
 ```bash
-pnpm add @mysten/seal @mysten/walrus
+pnpm add @mysten/seal @mysten/walrus zod
 ```
 
-2. **Update branding** in `App.tsx`:
+2. **Update branding** in `App.tsx` (completed):
 
 ```typescript
 <Heading>ColdCache - Decentralized Game Store</Heading>
 ```
 
-3. **Create Move package**:
+3. **Create Move package** (completed):
 
 ```bash
 cd move
 sui move new game_store
 ```
 
-4. **Add navigation structure** to replace counter functionality
+4. **Add navigation structure** (completed) - Router with
+   Home/Store/Library/Publish pages
 
 Your foundation is excellent! The Sui integration is already solid, and you just
 need to build the game store features on top of your existing architecture.

@@ -1,5 +1,6 @@
 import { SuiClient } from "@mysten/sui/client";
 import { GameNFT } from "../schemas/nft";
+// import { Seal } from "@mysten/seal"; // TODO: Import when implementing Seal integration
 
 interface DownloadProgress {
   stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
@@ -239,15 +240,23 @@ export class GameDownloadManager {
     encryptedData: ArrayBuffer,
     policyId: string,
   ): Promise<Blob> {
-    // TODO: Implement actual Seal decryption when @mysten/seal is integrated
-    // For now, return the raw data as a blob (assuming it's not encrypted yet)
-    console.log("🔐 Seal decryption not yet implemented, returning raw blob");
+    // TODO: Implement actual Seal decryption
+    // When ready, this will use:
+    // const seal = new Seal({ network: "testnet" });
+    // const decryptedData = await seal.decrypt(encryptedData, {
+    //   policyId,
+    //   userAddress: this.userAddress,
+    //   suiClient: this.suiClient,
+    // });
+    // return new Blob([decryptedData]);
+
+    console.log("🔐 Seal decryption placeholder - returning raw data");
     console.log("Policy ID:", policyId);
+    console.log("User address:", this.userAddress);
 
-    // Simulate some processing time
+    // For now, games are not encrypted yet, so return raw data
+    // This allows the download system to work while we prepare Seal integration
     await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Return the raw data as a blob
     return new Blob([encryptedData]);
   }
 

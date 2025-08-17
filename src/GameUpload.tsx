@@ -7,6 +7,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import { WalrusFile } from "@mysten/walrus";
 import { walrusClient } from "./lib/walrus";
 import { fileTypeFromBuffer } from "file-type";
+// import { Seal } from "@mysten/seal"; // TODO: Import when implementing Seal encryption
 import {
   Button,
   Card,
@@ -61,6 +62,35 @@ export function GameUpload() {
 
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
+
+  // TODO: Implement Seal encryption for uploaded games
+  const encryptGameWithSeal = async (
+    gameFile: File,
+    gameTitle: string,
+  ): Promise<{ encryptedFile: File; sealPolicyId: string }> => {
+    // Future Seal implementation:
+    // const seal = new Seal({ network: "testnet" });
+    // const policy = await seal.createPolicy({
+    //   name: `ColdCache Game: ${gameTitle}`,
+    //   type: "nft_ownership",
+    //   contract: gameStorePackageId,
+    //   verificationFunction: "verify_game_ownership",
+    // });
+    // const encryptedData = await seal.encrypt(gameFile.arrayBuffer(), policy.id);
+    // return {
+    //   encryptedFile: new File([encryptedData], gameFile.name, { type: gameFile.type }),
+    //   sealPolicyId: policy.id,
+    // };
+
+    // For now, return the original file (no encryption yet)
+    console.log(
+      "🔐 Seal encryption placeholder - games uploaded without encryption",
+    );
+    return {
+      encryptedFile: gameFile,
+      sealPolicyId: "", // Empty until Seal is integrated
+    };
+  };
 
   // Helper function to get the correct file extension based on MIME type
   const getFileExtension = (file: File): string => {
