@@ -7,6 +7,7 @@ module game_store::game_store {
     use sui::event;
     use sui::display;
     use sui::package;
+    use sui::bcs;
     use std::string::{Self, String};
     use std::vector;
 
@@ -14,6 +15,7 @@ module game_store::game_store {
     const EGameNotFound: u64 = 1;
     const ENotOwner: u64 = 2;
     const EGameNotActive: u64 = 3;
+    const ENoAccess: u64 = 4;
 
     /// One-Time-Witness for the module
     public struct GAME_STORE has drop {}
@@ -392,5 +394,48 @@ module game_store::game_store {
 
     public fun get_store_stats(store: &GameStore): (address, u64) {
         (store.admin, store.total_games)
+    }
+
+    // ==============================================
+    // SEAL ACCESS CONTROL FUNCTIONS
+    // ==============================================
+    
+    /// Seal access control: Check if caller owns NFT for the specified game
+    /// This function is called by Seal key servers to verify access rights
+    /// Format: seal_approve(id: vector<u8>, ...) where id is the game identifier  
+    entry fun seal_approve_game_access(
+        id: vector<u8>, 
+        nft: &GameNFT,
+        ctx: &TxContext
+    ) {
+        let caller = tx_context::sender(ctx);
+        
+        // Parse the requested game ID from Seal's encryption ID
+        // For now, we'll use a simpler approach - compare against our game_id bytes
+        let game_id_bytes = bcs::to_bytes(&nft.game_id);
+        assert!(id == game_id_bytes, EGameNotFound);
+        
+        // In Sui, if the caller can pass the NFT reference, they own it
+        // Additional verification: check publisher or purchase rights  
+        let has_access = (nft.publisher == caller) || (nft.is_publisher_nft == false);
+        assert!(has_access, ENoAccess);
+    }
+
+    /// Alternative seal approve for publisher access
+    /// Allows publishers to access their own published games
+    entry fun seal_approve_publisher_access(
+        id: vector<u8>,
+        nft: &GameNFT, 
+        ctx: &TxContext
+    ) {
+        let caller = tx_context::sender(ctx);
+        
+        // Parse the requested game ID and verify this is the right game
+        let game_id_bytes = bcs::to_bytes(&nft.game_id);
+        assert!(id == game_id_bytes, EGameNotFound);
+        
+        // Verify caller is the publisher with publisher NFT
+        assert!(nft.publisher == caller, ENoAccess);
+        assert!(nft.is_publisher_nft == true, ENoAccess);
     }
 }

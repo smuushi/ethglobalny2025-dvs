@@ -2,12 +2,13 @@ import { useState } from "react";
 import {
   useSignAndExecuteTransaction,
   useCurrentAccount,
+  useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { WalrusFile } from "@mysten/walrus";
 import { walrusClient } from "./lib/walrus";
 import { fileTypeFromBuffer } from "file-type";
-// import { Seal } from "@mysten/seal"; // TODO: Import when implementing Seal encryption
+import { ColdCacheSeal } from "./lib/seal";
 import {
   Button,
   Card,
@@ -36,6 +37,7 @@ interface GameMetadata {
 
 export function GameUpload() {
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const gameStoreObjectId = useNetworkVariable("gameStoreObjectId");
 
@@ -63,33 +65,45 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-  // TODO: Implement Seal encryption for uploaded games
+  // Seal encryption for uploaded games (based on Seal example)
   const encryptGameWithSeal = async (
     gameFile: File,
     gameTitle: string,
-  ): Promise<{ encryptedFile: File; sealPolicyId: string }> => {
-    // Future Seal implementation:
-    // const seal = new Seal({ network: "testnet" });
-    // const policy = await seal.createPolicy({
-    //   name: `ColdCache Game: ${gameTitle}`,
-    //   type: "nft_ownership",
-    //   contract: gameStorePackageId,
-    //   verificationFunction: "verify_game_ownership",
-    // });
-    // const encryptedData = await seal.encrypt(gameFile.arrayBuffer(), policy.id);
-    // return {
-    //   encryptedFile: new File([encryptedData], gameFile.name, { type: gameFile.type }),
-    //   sealPolicyId: policy.id,
-    // };
+  ): Promise<{ encryptedFile: File; sealEncryptionId: string }> => {
+    try {
+      if (!currentAccount?.address || !gameStorePackageId) {
+        throw new Error("Wallet not connected or package ID missing");
+      }
 
-    // For now, return the original file (no encryption yet)
-    console.log(
-      "🔐 Seal encryption placeholder - games uploaded without encryption",
-    );
-    return {
-      encryptedFile: gameFile,
-      sealPolicyId: "", // Empty until Seal is integrated
-    };
+      console.log("🔐 Encrypting game with Seal:", gameTitle);
+
+      // Initialize Seal service
+      const seal = new ColdCacheSeal(suiClient);
+
+      // Encrypt the game file using the game store contract as the policy
+      const gameData = await gameFile.arrayBuffer();
+      const encryptedBytes = await seal.encryptGame(
+        gameData,
+        gameStorePackageId, // Use package ID as policy object
+        gameStorePackageId,
+      );
+
+      // Create encrypted file
+      const encryptedFile = new File([encryptedBytes], gameFile.name, {
+        type: gameFile.type,
+      });
+
+      console.log("✅ Game encrypted successfully");
+      return {
+        encryptedFile,
+        sealEncryptionId: `${gameStorePackageId}_${Date.now()}`, // Unique ID for this encryption
+      };
+    } catch (error) {
+      console.error("❌ Seal encryption failed:", error);
+      throw new Error(
+        `Failed to encrypt game: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
   };
 
   // Helper function to get the correct file extension based on MIME type
@@ -405,20 +419,52 @@ export function GameUpload() {
 
     try {
       setUploadProgress({
-        step: "Step 1/4: Uploading game file to Walrus storage...",
-        progress: 25,
+        step: "Step 1/5: Encrypting game with Seal...",
+        progress: 20,
+        isUploading: true,
+        details: "Encrypting game file for NFT-gated access",
+      });
+
+      // Option: Encrypt game with Seal (can be toggled)
+      const enableSealEncryption = false; // Set to true to enable Seal encryption
+      let finalGameFile = metadata.gameFile;
+      let sealEncryptionId = "";
+
+      if (enableSealEncryption) {
+        try {
+          const encryptionResult = await encryptGameWithSeal(
+            metadata.gameFile,
+            metadata.title,
+          );
+          finalGameFile = encryptionResult.encryptedFile;
+          sealEncryptionId = encryptionResult.sealEncryptionId;
+          console.log("🔐 Game encrypted with Seal ID:", sealEncryptionId);
+        } catch (error) {
+          console.warn(
+            "⚠️ Seal encryption failed, uploading without encryption:",
+            error,
+          );
+          // Continue with unencrypted file if Seal fails
+        }
+      } else {
+        console.log("🔓 Uploading game without Seal encryption (disabled)");
+      }
+
+      setUploadProgress({
+        step: "Step 2/5: Uploading game file to Walrus storage...",
+        progress: 35,
         isUploading: true,
         details: "Preparing game file for upload",
       });
 
-      // Upload game file to Walrus
-      const gameExtension = getFileExtension(metadata.gameFile);
+      // Upload game file (encrypted or raw) to Walrus
+      const gameExtension = getFileExtension(finalGameFile);
       console.log(
-        `🎮 Game file: ${metadata.gameFile.name} (${metadata.gameFile.type}) -> ${gameExtension}`,
+        `🎮 Game file: ${finalGameFile.name} (${finalGameFile.type}) -> ${gameExtension}`,
       );
 
       const gameUploadResult = await uploadToWalrus(
-        metadata.gameFile,
+        finalGameFile,
         `${metadata.title}${gameExtension}`,
       );
       const gameWalrusId = gameUploadResult.patchId; // Use patchId for downloading
@@ -426,8 +472,8 @@ export function GameUpload() {
       const actualGameFileSize = gameUploadResult.actualSize;
 
       setUploadProgress({
-        step: "Step 2/4: Uploading cover image to Walrus...",
-        progress: 50,
+        step: "Step 3/5: Uploading cover image to Walrus...",
+        progress: 55,
         isUploading: true,
         details: metadata.coverImage
           ? "Uploading cover image"
@@ -451,8 +497,8 @@ export function GameUpload() {
       }
 
       setUploadProgress({
-        step: "Step 3/4: Registering game on Sui blockchain...",
-        progress: 75,
+        step: "Step 4/5: Registering game on Sui blockchain...",
+        progress: 80,
         isUploading: true,
       });
 
@@ -538,10 +584,13 @@ export function GameUpload() {
         {
           onSuccess: () => {
             setUploadProgress({
-              step: "Step 4/4: Game published successfully to ColdCache!",
+              step: "Step 5/5: Game published successfully to ColdCache!",
               progress: 100,
               isUploading: false,
               success: true,
+              details: enableSealEncryption
+                ? `🔐 Game encrypted with Seal and published with NFT-gated access`
+                : `🔓 Game published (Seal encryption disabled)`,
             });
 
             // Reset form

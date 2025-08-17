@@ -240,15 +240,28 @@ export class GameDownloadManager {
     encryptedData: ArrayBuffer,
     policyId: string,
   ): Promise<Blob> {
-    // TODO: Implement actual Seal decryption
-    // When ready, this will use:
-    // const seal = new Seal({ network: "testnet" });
-    // const decryptedData = await seal.decrypt(encryptedData, {
-    //   policyId,
-    //   userAddress: this.userAddress,
-    //   suiClient: this.suiClient,
-    // });
-    // return new Blob([decryptedData]);
+    // TODO: Implement actual Seal decryption using our game_store contract
+    // When ready, this will use ColdCacheSeal with proper move call constructor:
+    //
+    // const seal = new ColdCacheSeal(this.suiClient);
+    // const sessionKey = await seal.createSessionKey();
+    //
+    // const moveCallConstructor = (tx: Transaction, id: string) => {
+    //   tx.moveCall({
+    //     target: `${packageId}::game_store::seal_approve_game_access`,
+    //     arguments: [
+    //       tx.pure.vector("u8", Array.from(new TextEncoder().encode(id))),
+    //       tx.object(nftObjectId), // User's NFT for this game
+    //     ],
+    //   });
+    // };
+    //
+    // const decryptedBytes = await seal.decryptGame(
+    //   new Uint8Array(encryptedData),
+    //   sessionKey,
+    //   moveCallConstructor
+    // );
+    // return new Blob([decryptedBytes]);
 
     console.log("🔐 Seal decryption placeholder - returning raw data");
     console.log("Policy ID:", policyId);
