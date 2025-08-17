@@ -253,34 +253,45 @@ export class ColdCacheSeal {
     moveCallConstructor: MoveCallConstructor,
   ): Promise<boolean> {
     try {
-      console.log("🔐 Verifying ownership using Seal access control");
+      console.log("🔐 Verifying ownership using Move contract dry run");
       console.log("🎮 Game ID:", gameId);
       console.log("👤 User:", userAddress);
 
-      // Try to fetch keys - if this succeeds, the user has access
+      // Instead of using Seal's fetchKeys (which requires real encrypted data),
+      // let's just test if the Move contract call would succeed with a dry run
+      const testEncryptionId = "test_id_for_verification"; // Dummy ID for testing
+
+      console.log("🔗 Building test transaction with ID:", testEncryptionId);
+
+      // Try to build and dry-run the transaction
       const tx = new Transaction();
-      moveCallConstructor(tx, gameId);
-      const txBytes = await tx.build({
-        client: this.suiClient,
-        onlyTransactionKind: true,
+      tx.setSender(userAddress); // Set the transaction sender for dry run
+      moveCallConstructor(tx, testEncryptionId);
+
+      // Dry run the transaction to see if it would succeed
+      const result = await this.suiClient.dryRunTransactionBlock({
+        transactionBlock: await tx.build({ client: this.suiClient }),
       });
 
-      await this.client.fetchKeys({
-        ids: [gameId],
-        txBytes,
-        sessionKey,
-        threshold: 1, // Lower threshold for verification only
-      });
+      console.log("🔗 Dry run result:", result.effects?.status?.status);
 
-      console.log("✅ Seal ownership verification successful");
-      return true;
-    } catch (error) {
-      if (error instanceof NoAccessError) {
-        console.log("❌ Seal ownership verification failed: No access");
-        return false;
+      // If dry run succeeds, the user has access
+      const hasAccess = result.effects?.status?.status === "success";
+
+      if (hasAccess) {
+        console.log("✅ Move contract verification successful");
+      } else {
+        console.log("❌ Move contract verification failed");
+        console.log("🔍 Error details:", result.effects?.status?.error);
       }
 
-      console.warn("⚠️ Seal ownership verification error:", error);
+      return hasAccess;
+    } catch (error) {
+      console.warn("⚠️ Ownership verification error:", error);
+      console.warn("⚠️ Error details:", {
+        name: error?.constructor?.name,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       return false;
     }
   }

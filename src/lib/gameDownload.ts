@@ -17,6 +17,7 @@ export class GameDownloadManager {
   private userAddress: string;
   private sessionKey?: any; // SessionKey from @mysten/seal
   private sealVerifier: SealOwnershipVerifier;
+  private verifiedNFTId?: string; // Store the actual NFT ID after verification
 
   constructor(suiClient: SuiClient, userAddress: string, sessionKey?: any) {
     this.suiClient = suiClient;
@@ -112,13 +113,18 @@ export class GameDownloadManager {
       }
 
       // Let Seal verify ownership - much simpler!
-      const { hasAccess } = await this.sealVerifier.verifyOwnership(
+      const { hasAccess, nftId } = await this.sealVerifier.verifyOwnership(
         game.gameId || game.id,
         this.userAddress,
         sessionKey,
       );
 
       console.log("🎯 Seal verification result:", hasAccess);
+      if (hasAccess && nftId) {
+        // Store the actual NFT ID for later use in decryption
+        this.verifiedNFTId = nftId;
+        console.log("🎫 Verified NFT ID stored:", this.verifiedNFTId);
+      }
       return hasAccess;
     } catch (error) {
       console.error("❌ Seal ownership verification failed:", error);
@@ -177,9 +183,12 @@ export class GameDownloadManager {
       }
       console.log("✅ Session key ready for decryption");
 
-      // Since ownership was already verified, use the game ID for Seal verification
-      const gameNFTId = game.gameId || game.id;
-      console.log("🎫 Using game/NFT ID for Seal decryption:", gameNFTId);
+      // Use the verified NFT ID from ownership verification
+      const gameNFTId = this.verifiedNFTId || game.gameId || game.id;
+      console.log("🎫 Using verified NFT ID for Seal decryption:", gameNFTId);
+      console.log("🔍 Debug: verifiedNFTId =", this.verifiedNFTId);
+      console.log("🔍 Debug: game.gameId =", game.gameId);
+      console.log("🔍 Debug: game.id =", game.id);
 
       // Create move call constructor for access verification (synchronous, imports cached)
       const { fromHex } = await import("@mysten/sui/utils");
