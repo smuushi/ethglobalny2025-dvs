@@ -134,7 +134,7 @@ export function HomePage() {
               boxShadow: iglooTheme.shadows.ice,
             }}
           >
-            Learn More
+            🏠 Browse Games
           </Button>
         </Link>
       </Box>
@@ -226,7 +226,7 @@ export function HomePage() {
             textShadow: "0 1px 4px rgba(14, 165, 233, 0.1)",
           }}
         >
-          Featured
+          Featured Games
         </Heading>
 
         <Grid columns={{ initial: "1", sm: "2", lg: "4" }} gap="4">
@@ -356,7 +356,7 @@ export function HomePage() {
                 padding: "12px 24px",
               }}
             >
-              🏪 Explore Store
+              🏠 Browse Games
             </Button>
           </Link>
           <Link to="/publish" style={{ textDecoration: "none" }}>

@@ -11,9 +11,9 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   const navItems = [
-    { path: "/", label: "🏔️ Explore", emoji: "🏔️" },
+    { path: "/", label: "🏠 Home", emoji: "🏠" },
     { path: "/store", label: "🏪 Store", emoji: "🏪" },
-    { path: "/library", label: "📚 My Library", emoji: "📚" },
+    { path: "/library", label: "📚 Library", emoji: "📚" },
     { path: "/publish", label: "📤 Publish", emoji: "📤" },
   ];
 
