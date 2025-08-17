@@ -314,6 +314,16 @@ module game_store::game_store {
         nft
     }
 
+    /// Entry function for purchasing a game
+    public entry fun purchase_game_entry(
+        game: &mut Game,
+        payment: Coin<SUI>,
+        ctx: &mut TxContext
+    ) {
+        let nft = purchase_game(game, payment, ctx);
+        transfer::public_transfer(nft, tx_context::sender(ctx));
+    }
+
     public fun verify_game_ownership(
         nft: &GameNFT,
         game_id: ID

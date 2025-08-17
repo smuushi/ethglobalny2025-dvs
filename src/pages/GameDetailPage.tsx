@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useSuiClientQuery, useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useSuiClientQuery,
+  useCurrentAccount,
+  useSuiClient,
+  useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
 import {
   Box,
   Card,
@@ -20,6 +25,8 @@ import {
   generateSecureDownloadUrl,
   logSecureDownloadAttempt,
 } from "../lib/secureDownload";
+import { Transaction } from "@mysten/sui/transactions";
+import { useNetworkVariable } from "../networkConfig";
 
 interface Game {
   id: string;
@@ -47,18 +54,59 @@ function PurchaseModal({ game, isOpen, onClose }: PurchaseModalProps) {
     "pending",
   );
 
+  // Sui hooks
+  const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const gameStorePackageId = useNetworkVariable("gameStorePackageId");
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+
   const formatPrice = (priceInMist: number) => {
     return (priceInMist / 1000000000).toFixed(2);
   };
 
   const handlePurchase = async () => {
+    if (!currentAccount) {
+      setStatus("error");
+      return;
+    }
+
     setStep("status");
     setStatus("pending");
 
-    // Simulate transaction
-    setTimeout(() => {
-      setStatus("success");
-    }, 2000);
+    try {
+      const tx = new Transaction();
+
+      // Split the payment into the exact amount needed
+      const [coin] = tx.splitCoins(tx.gas, [game.price]);
+
+      // Call purchase_game_entry
+      tx.moveCall({
+        target: `${gameStorePackageId}::game_store::purchase_game_entry`,
+        arguments: [
+          tx.object(game.id), // game object
+          coin, // payment coin
+        ],
+      });
+
+      signAndExecuteTransaction(
+        {
+          transaction: tx,
+        },
+        {
+          onSuccess: (result) => {
+            console.log("Purchase successful:", result);
+            setStatus("success");
+          },
+          onError: (error) => {
+            console.error("Purchase failed:", error);
+            setStatus("error");
+          },
+        },
+      );
+    } catch (error) {
+      console.error("Failed to create purchase transaction:", error);
+      setStatus("error");
+    }
   };
 
   const handleClose = () => {
