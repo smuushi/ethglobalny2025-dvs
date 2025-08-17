@@ -1,13 +1,5 @@
 import { SuiClient } from "@mysten/sui/client";
-
-interface GameNFT {
-  id: string;
-  gameId: string;
-  title: string;
-  walrusBlobId: string;
-  sealPolicyId: string;
-  currentOwner: string;
-}
+import { GameNFT } from "../schemas/nft";
 
 interface DownloadProgress {
   stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
@@ -59,7 +51,7 @@ export class GameDownloadManager {
 
       const decryptedGame = await this.decryptWithSeal(
         encryptedGame,
-        game.sealPolicyId,
+        game.sealPolicyId || "",
       );
 
       // Stage 4: Complete
@@ -94,19 +86,61 @@ export class GameDownloadManager {
       console.log("🏪 GameStore NFTs found:", gameStoreNFTs.length);
       console.log("🎫 NFT Contract NFTs found:", nftContractNFTs.length);
 
-      // Check if user owns an NFT for this game
+      // Debug: Log all NFT data first
+      console.log(
+        "🔍 All GameStore NFTs:",
+        JSON.stringify(gameStoreNFTs, null, 2),
+      );
+      console.log(
+        "🔍 All NFT Contract NFTs:",
+        JSON.stringify(nftContractNFTs, null, 2),
+      );
+      console.log("🔍 Looking for game ID:", game.gameId);
+      console.log("🔍 Game object:", JSON.stringify(game, null, 2));
+
+      // Ownership check: Do you own an NFT for this game?
+      // The game object represents a game you want to download
+      // We need to check if you own ANY NFT that gives you access to this game
       const ownsGameStoreNFT = gameStoreNFTs.some((nft: any) => {
+        const nftId = nft.data?.objectId;
         const nftGameId = nft.data?.content?.fields?.game_id;
-        console.log(`Checking GameStore NFT: ${nftGameId} vs ${game.gameId}`);
-        return nftGameId === game.gameId;
+        const nftWalrusBlobId = nft.data?.content?.fields?.walrus_blob_id;
+
+        // Check multiple ways to match:
+        // 1. NFT ID matches the game's NFT ID (exact NFT match)
+        // 2. NFT's game_id matches what we're trying to download
+        // 3. NFT's walrus_blob_id matches (same game file)
+        const matchesNftId = nftId === game.id;
+        const matchesGameId = nftGameId === game.gameId;
+        const matchesWalrusBlobId = nftWalrusBlobId === game.walrusBlobId;
+
+        console.log(
+          `Checking GameStore NFT: ${nftId}`,
+          `\n  - NFT ID match: ${matchesNftId} (${nftId} === ${game.id})`,
+          `\n  - Game ID match: ${matchesGameId} (${nftGameId} === ${game.gameId})`,
+          `\n  - Walrus blob match: ${matchesWalrusBlobId} (${nftWalrusBlobId} === ${game.walrusBlobId})`,
+        );
+
+        return matchesNftId || matchesGameId || matchesWalrusBlobId;
       });
 
       const ownsNFTContractNFT = nftContractNFTs.some((nft: any) => {
+        const nftId = nft.data?.objectId;
         const nftGameId = nft.data?.content?.fields?.game_id;
+        const nftWalrusBlobId = nft.data?.content?.fields?.walrus_blob_id;
+
+        const matchesNftId = nftId === game.id;
+        const matchesGameId = nftGameId === game.gameId;
+        const matchesWalrusBlobId = nftWalrusBlobId === game.walrusBlobId;
+
         console.log(
-          `Checking NFT Contract NFT: ${nftGameId} vs ${game.gameId}`,
+          `Checking NFT Contract NFT: ${nftId}`,
+          `\n  - NFT ID match: ${matchesNftId}`,
+          `\n  - Game ID match: ${matchesGameId}`,
+          `\n  - Walrus blob match: ${matchesWalrusBlobId}`,
         );
-        return nftGameId === game.gameId;
+
+        return matchesNftId || matchesGameId || matchesWalrusBlobId;
       });
 
       const ownsGame = ownsGameStoreNFT || ownsNFTContractNFT;
@@ -121,17 +155,27 @@ export class GameDownloadManager {
 
   private async queryGameStoreNFTs(): Promise<any[]> {
     try {
+      // Get the package IDs from the network config
+      // We need to construct the full StructType with the actual package ID
       const result = await this.suiClient.getOwnedObjects({
         owner: this.userAddress,
-        filter: {
-          StructType: "::game_store::GameNFT",
-        },
         options: {
           showContent: true,
           showType: true,
         },
       });
-      return result?.data || [];
+
+      // Filter for GameStore NFTs by checking the type
+      const gameStoreNFTs =
+        result?.data?.filter((nft: any) => {
+          const type = nft.data?.type;
+          return type && type.includes("::game_store::GameNFT");
+        }) || [];
+
+      console.log("🔍 All owned objects:", result?.data?.length);
+      console.log("🏪 Filtered GameStore NFTs:", gameStoreNFTs.length);
+
+      return gameStoreNFTs;
     } catch (error) {
       console.warn("Failed to query GameStore NFTs:", error);
       return [];
@@ -140,17 +184,25 @@ export class GameDownloadManager {
 
   private async queryNFTContractNFTs(): Promise<any[]> {
     try {
+      // Get all owned objects and filter for NFT contract NFTs
       const result = await this.suiClient.getOwnedObjects({
         owner: this.userAddress,
-        filter: {
-          StructType: "::nft::GameNFT",
-        },
         options: {
           showContent: true,
           showType: true,
         },
       });
-      return result?.data || [];
+
+      // Filter for NFT Contract NFTs by checking the type
+      const nftContractNFTs =
+        result?.data?.filter((nft: any) => {
+          const type = nft.data?.type;
+          return type && type.includes("::nft::GameNFT");
+        }) || [];
+
+      console.log("🎫 Filtered NFT Contract NFTs:", nftContractNFTs.length);
+
+      return nftContractNFTs;
     } catch (error) {
       console.warn("Failed to query NFT Contract NFTs:", error);
       return [];

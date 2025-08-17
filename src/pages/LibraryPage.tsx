@@ -21,23 +21,13 @@ import {
 import { useNetworkVariable } from "../networkConfig";
 import { GameDownloadManager } from "../lib/gameDownload";
 import { iglooTheme, iglooStyles } from "../theme";
-
-interface GameNFT {
-  id: string;
-  gameId: string;
-  title: string;
-  description: string;
-  price: string;
-  publisher: string;
-  walrusBlobId: string;
-  sealPolicyId: string;
-  coverImageBlobId: string;
-  genre: string;
-  publishDate: string;
-  owners: string[];
-  mintDate: string;
-  currentOwner: string;
-}
+import {
+  GameNFT,
+  parseGameNFTFromSui,
+  getWalrusImageUrl,
+  formatPriceToSui,
+  formatTimestamp,
+} from "../schemas/nft";
 
 interface DownloadState {
   gameId: string;
@@ -102,72 +92,25 @@ export function LibraryPage() {
   const isPending = nftPending || gameStorePending;
   const error = nftError || gameStoreError;
 
-  const parseGameNFT = (obj: any): GameNFT | null => {
-    try {
-      const fields = obj.data?.content?.fields;
-      if (!fields) return null;
-
-      return {
-        id: obj.data.objectId,
-        gameId: fields.game_id,
-        title: fields.title,
-        description: fields.description,
-        price: fields.price,
-        publisher: fields.publisher,
-        walrusBlobId: fields.walrus_blob_id,
-        sealPolicyId: fields.seal_policy_id,
-        coverImageBlobId: fields.cover_image_blob_id,
-        genre: fields.genre,
-        publishDate: fields.publish_date,
-        owners: fields.owners || [],
-        mintDate: fields.mint_date,
-        currentOwner: fields.current_owner,
-      };
-    } catch (error) {
-      console.error("Error parsing GameNFT:", error);
-      return null;
-    }
-  };
-
-  // Parse enhanced game store NFTs with rich metadata
+  // Parse NFTs using the schema-based parser
   const parseGameStoreNFT = (
     obj: any,
   ): (GameNFT & { isPublished: boolean }) | null => {
-    try {
-      const fields = obj.data?.content?.fields;
-      if (!fields) return null;
+    // Debug logging to understand the enhanced data structure
+    console.log("Enhanced NFT fields:", obj.data?.content?.fields);
 
-      // Debug logging to understand the enhanced data structure
-      console.log("Enhanced NFT fields:", fields);
+    const gameNFT = parseGameNFTFromSui(obj);
+    if (!gameNFT) return null;
 
-      const isPublished = fields.is_publisher_nft === true;
-
-      return {
-        id: obj.data.objectId,
-        gameId: fields.game_id,
-        title: fields.title || "Game " + fields.game_id.slice(-8),
-        description: fields.description || "Game description",
-        price: fields.price?.toString() || "0",
-        publisher: fields.publisher || currentAccount?.address || "",
-        walrusBlobId: fields.walrus_blob_id || "",
-        sealPolicyId: "", // Would need Seal integration
-        coverImageBlobId: fields.cover_image_blob_id || "",
-        genre: fields.genre || "Unknown",
-        publishDate: fields.publish_date || fields.purchase_date,
-        owners: [currentAccount?.address || ""],
-        mintDate: fields.purchase_date,
-        currentOwner: currentAccount?.address || "",
-        isPublished,
-      };
-    } catch (error) {
-      console.error("Error parsing Enhanced GameStore NFT:", error);
-      return null;
-    }
+    return {
+      ...gameNFT,
+      isPublished: gameNFT.isPublished || false,
+    };
   };
 
   const gameNFTs =
     nftObjects?.data
-      ?.map(parseGameNFT)
+      ?.map(parseGameNFTFromSui)
       .filter((nft): nft is GameNFT => nft !== null) || [];
 
   const publishedGames =
@@ -238,18 +181,7 @@ export function LibraryPage() {
     }
   };
 
-  const formatDate = (timestamp: string) => {
-    return new Date(parseInt(timestamp) * 1000).toLocaleDateString();
-  };
-
-  const formatPrice = (price: string) => {
-    return (parseInt(price) / 1000000000).toFixed(2) + " SUI";
-  };
-
-  const getWalrusImageUrl = (blobId: string) => {
-    if (!blobId) return null;
-    return `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${blobId}`;
-  };
+  // Helper functions are now imported from schema file
 
   if (!currentAccount) {
     return (
@@ -330,7 +262,10 @@ export function LibraryPage() {
                 <Flex align="center" mb="3">
                   <Avatar
                     size="3"
-                    src={getWalrusImageUrl(game.coverImageBlobId) || undefined}
+                    src={
+                      getWalrusImageUrl(game.coverImageBlobId || "") ||
+                      undefined
+                    }
                     fallback={
                       "isPublished" in game && game.isPublished ? "🎨" : "🎮"
                     }
@@ -397,7 +332,7 @@ export function LibraryPage() {
                       size="1"
                       style={{ color: iglooTheme.colors.ice[700] }}
                     >
-                      {formatDate(game.mintDate)}
+                      {formatTimestamp(game.mintDate)}
                     </Text>
                   </Flex>
                   {!("isPublished" in game && (game as any).isPublished) ? (
@@ -412,7 +347,7 @@ export function LibraryPage() {
                         size="1"
                         style={{ color: iglooTheme.colors.ice[700] }}
                       >
-                        {formatPrice(game.price)}
+                        {formatPriceToSui(game.price)}
                       </Text>
                     </Flex>
                   ) : (
@@ -427,7 +362,7 @@ export function LibraryPage() {
                         size="1"
                         style={{ color: iglooTheme.colors.ice[700] }}
                       >
-                        {formatPrice(game.price)}
+                        {formatPriceToSui(game.price)}
                       </Text>
                     </Flex>
                   )}
