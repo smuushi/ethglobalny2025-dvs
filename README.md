@@ -843,33 +843,6 @@ public fun transfer_game(
 
 ---
 
-## 🤝 **Contributing**
-
-### **Development Setup**
-
-1. **Fork** the repository
-2. **Create feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make changes** and test thoroughly
-4. **Commit changes**: `git commit -m 'Add amazing feature'`
-5. **Push branch**: `git push origin feature/amazing-feature`
-6. **Open Pull Request** with detailed description
-
-### **Code Standards**
-
-- **TypeScript**: Strict type checking enabled
-- **ESLint**: Code quality and consistency
-- **Prettier**: Automatic code formatting
-- **Testing**: Component and integration tests
-
-### **Smart Contract Guidelines**
-
-- **Gas optimization**: Efficient Move code
-- **Security audits**: Thorough testing
-- **Documentation**: Comprehensive comments
-- **Upgradability**: Consider future improvements
-
----
-
 ## 📄 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
@@ -877,35 +850,27 @@ for details.
 
 ---
 
-## 🌟 **Acknowledgments**
+## 🙏 **Special Thanks**
 
-- **Mysten Labs** for Sui blockchain, Walrus storage, and Seal encryption
-- **Radix UI** for beautiful, accessible components
-- **Vercel** for seamless deployment platform
-- **Open Source Community** for incredible tools and libraries
+Special thanks to **@DanTheMan8300** (Developer Relations Engineer at Mysten Labs) for helping debug and getting us excited to build on Sui! 
 
 ---
 
-## 📞 **Support & Community**
+## 🚀 **Future Vision**
 
-- **🐛 Issues**:
-  [GitHub Issues](https://github.com/smuushi/ethglobalny2025-dvs/issues)
-- **💬 Discussions**:
-  [GitHub Discussions](https://github.com/smuushi/ethglobalny2025-dvs/discussions)
-- **📧 Contact**: [Email Support](mailto:support@coldcache.xyz)
-- **🐦 Updates**: [Twitter @ColdCache](https://twitter.com/coldcache)
+Our hope is that a storefront pushing NFT games will inspire people and game developers to build on top of people's existing wallets that they now have - creating **proof of ownership in games** since everyone has a wallet, allowing us to avoid intrusive DRMs.
 
----
+### **🎮 Wallet-Native Gaming Ecosystem**
 
-## 🚀 **Future Roadmap**
+With true NFT ownership established, we envision:
 
-- [ ] **Mobile App**: iOS and Android applications
-- [ ] **Game Reviews**: Community rating system
-- [ ] **Achievement System**: Blockchain-based achievements
-- [ ] **Multiplayer Support**: Decentralized game sessions
-- [ ] **Creator Tools**: In-browser game development
-- [ ] **Cross-Chain**: Multi-blockchain support
-- [ ] **DAO Governance**: Community-driven platform evolution
+- **📚 Personal Game Libraries**: Users can build out personal lending systems for their game collections, sharing titles with friends and family through smart contracts
+- **🏪 Personal Marketplaces**: Individual collectors can create their own storefronts, curating and reselling their game collections with custom pricing and bundles
+- **🤝 Community Sharing**: Digital game libraries that work like traditional libraries - communities can pool resources, share collections, and provide access to games for educational or social purposes
+- **🔄 Dynamic Ownership**: Games that can be temporarily transferred, loaned, or shared while maintaining permanent ownership records
+- **🎯 DRM-Free Future**: Wallet-based ownership eliminates the need for invasive DRM systems, creating a more open and user-friendly gaming experience
+
+This represents a fundamental shift from platform-controlled game ownership to truly user-owned digital assets that can be freely shared, traded, and enjoyed across communities.
 
 ---
 
