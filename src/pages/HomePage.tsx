@@ -129,8 +129,9 @@ export function HomePage() {
             src="/logo_transparent.png"
             alt="ColdCache Logo"
             style={{
-              height: "clamp(180px, 25vw, 280px)",
-              width: "auto",
+              height: "clamp(120px, 15vw, 180px)",
+              width: "clamp(120px, 15vw, 180px)",
+              objectFit: "contain",
               display: "inline-block",
             }}
           />
