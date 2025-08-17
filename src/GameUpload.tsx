@@ -85,13 +85,18 @@ export function GameUpload() {
       const seal = new ColdCacheSeal(suiClient);
 
       // Memory-efficient encryption for large files
-      console.log(`🔐 Starting encryption for ${gameFile.name} (${(gameFile.size / 1024 / 1024).toFixed(1)}MB)`);
-      
+      console.log(
+        `🔐 Starting encryption for ${gameFile.name} (${(gameFile.size / 1024 / 1024).toFixed(1)}MB)`,
+      );
+
       let gameData: ArrayBuffer;
       let encryptedBytes: ArrayBuffer;
-      
-      if (gameFile.size > 100 * 1024 * 1024) { // For files > 100MB
-        console.log(`⚡ Large file detected - using memory-efficient encryption`);
+
+      if (gameFile.size > 100 * 1024 * 1024) {
+        // For files > 100MB
+        console.log(
+          `⚡ Large file detected - using memory-efficient encryption`,
+        );
         // For large files, we still need the buffer but we'll be more careful
         gameData = await gameFile.arrayBuffer();
         encryptedBytes = await seal.encryptGame(
@@ -257,7 +262,8 @@ export function GameUpload() {
 
       // Memory-efficient file type detection
       let fileType = null;
-      if (file.size < 50 * 1024 * 1024) { // Only for files < 50MB
+      if (file.size < 50 * 1024 * 1024) {
+        // Only for files < 50MB
         const fileBuffer = await file.arrayBuffer();
         fileType = await fileTypeFromBuffer(new Uint8Array(fileBuffer));
       }
@@ -305,7 +311,9 @@ export function GameUpload() {
       }
 
       // Memory-efficient WalrusFile creation
-      console.log(`📦 Creating WalrusFile for ${file.name} without loading full file into memory`);
+      console.log(
+        `📦 Creating WalrusFile for ${file.name} without loading full file into memory`,
+      );
       const walrusFile = WalrusFile.from({
         contents: file, // Pass File directly instead of loading into memory
         identifier: file.name,
