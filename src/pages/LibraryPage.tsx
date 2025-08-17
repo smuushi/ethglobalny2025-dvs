@@ -154,9 +154,9 @@ export function LibraryPage() {
         coverImageBlobId: fields.cover_image_blob_id || "",
         genre: fields.genre || "Unknown",
         publishDate: fields.publish_date || fields.purchase_date,
-        owners: [fields.owner],
+        owners: [currentAccount?.address || ""],
         mintDate: fields.purchase_date,
-        currentOwner: fields.owner,
+        currentOwner: currentAccount?.address || "",
         isPublished,
       };
     } catch (error) {

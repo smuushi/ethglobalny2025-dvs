@@ -53,7 +53,6 @@ module game_store::game_store {
         cover_image_blob_id: String,
         genre: String,
         publish_date: u64,
-        owner: address,
         purchase_date: u64,
         is_publisher_nft: bool, // true for publisher, false for buyers
     }
@@ -249,7 +248,6 @@ module game_store::game_store {
             cover_image_blob_id: game.cover_image_blob_id,
             genre: game.genre,
             publish_date: game.publish_date,
-            owner: tx_context::sender(ctx),
             purchase_date: tx_context::epoch(ctx),
             is_publisher_nft: true,
         };
@@ -298,7 +296,6 @@ module game_store::game_store {
             cover_image_blob_id: game.cover_image_blob_id,
             genre: game.genre,
             publish_date: game.publish_date,
-            owner: tx_context::sender(ctx),
             purchase_date: tx_context::epoch(ctx),
             is_publisher_nft: false,
         };
@@ -317,10 +314,9 @@ module game_store::game_store {
 
     public fun verify_game_ownership(
         nft: &GameNFT,
-        game_id: ID,
-        owner: address
+        game_id: ID
     ): bool {
-        nft.game_id == game_id && nft.owner == owner
+        nft.game_id == game_id
     }
 
     public fun transfer_game_nft(nft: GameNFT, to: address) {
@@ -372,12 +368,12 @@ module game_store::game_store {
         )
     }
 
-    public fun get_nft_info(nft: &GameNFT): (ID, address, u64) {
-        (nft.game_id, nft.owner, nft.purchase_date)
+    public fun get_nft_info(nft: &GameNFT): (ID, u64) {
+        (nft.game_id, nft.purchase_date)
     }
 
     public fun get_enhanced_nft_info(nft: &GameNFT): (
-        ID, String, String, u64, address, String, String, String, u64, address, u64, bool
+        ID, String, String, u64, address, String, String, String, u64, u64, bool
     ) {
         (
             nft.game_id,
@@ -389,7 +385,6 @@ module game_store::game_store {
             nft.cover_image_blob_id,
             nft.genre,
             nft.publish_date,
-            nft.owner,
             nft.purchase_date,
             nft.is_publisher_nft
         )
