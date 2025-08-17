@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import {
-  useSuiClientQuery,
-  useCurrentAccount,
-  useSuiClient,
-} from "@mysten/dapp-kit";
+import { useSuiClientQuery, useCurrentAccount } from "@mysten/dapp-kit";
 import {
   Box,
   Card,
@@ -18,7 +14,7 @@ import {
   Skeleton,
   Dialog,
 } from "@radix-ui/themes";
-import { useNetworkVariable } from "../networkConfig";
+
 import { iglooTheme, iglooStyles } from "../theme";
 import {
   generateSecureDownloadUrl,
@@ -233,18 +229,15 @@ function PurchaseModal({ game, isOpen, onClose }: PurchaseModalProps) {
 export function GameDetailPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const currentAccount = useCurrentAccount();
-  const suiClient = useSuiClient();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{
+  const [downloadProgress] = useState<{
     stage: string;
     progress: number;
     message: string;
   } | null>(null);
-  const gameStorePackageId = useNetworkVariable("gameStorePackageId");
 
   // Mock ownership check - in real app, this would query user's NFTs
-  const [isOwned, setIsOwned] = useState(false);
+  const [isOwned] = useState(false);
 
   // Fetch game details
   const { data: gameData, isLoading } = useSuiClientQuery(

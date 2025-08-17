@@ -60,11 +60,7 @@ export class GameDownloadManager {
         message: "Decrypting game with Seal...",
       });
 
-      const decryptedGame = await this.decryptWithSeal(
-        encryptedGame,
-        game,
-        true,
-      );
+      const decryptedGame = await this.decryptWithSeal(encryptedGame, game);
 
       // Stage 4: Complete
       onProgress?.({
@@ -159,7 +155,6 @@ export class GameDownloadManager {
   private async decryptWithSeal(
     encryptedData: ArrayBuffer,
     game: GameNFT,
-    ownershipAlreadyVerified: boolean = false,
   ): Promise<Blob> {
     try {
       console.log("🔐 Attempting Seal decryption for game:", game.title);
@@ -234,7 +229,7 @@ export class GameDownloadManager {
       );
 
       console.log("✅ Game decrypted successfully with Seal");
-      return new Blob([decryptedBytes]);
+      return new Blob([new Uint8Array(decryptedBytes)]);
     } catch (error) {
       console.error("❌ Seal decryption failed:", error);
 

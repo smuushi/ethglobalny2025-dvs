@@ -89,9 +89,13 @@ export function GameUpload() {
       );
 
       // Create encrypted file
-      const encryptedFile = new File([encryptedBytes], gameFile.name, {
-        type: gameFile.type,
-      });
+      const encryptedFile = new File(
+        [new Uint8Array(encryptedBytes)],
+        gameFile.name,
+        {
+          type: gameFile.type,
+        },
+      );
 
       console.log("✅ Game encrypted successfully");
       return {

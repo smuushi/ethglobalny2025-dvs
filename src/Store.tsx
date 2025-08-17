@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSuiClientQuery, useCurrentAccount } from "@mysten/dapp-kit";
+import { useSuiClientQuery } from "@mysten/dapp-kit";
 import {
   Card,
   Grid,

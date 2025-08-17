@@ -21,7 +21,7 @@ import {
 } from "@mysten/dapp-kit";
 import { useNetworkVariable } from "../networkConfig";
 import { GameDownloadManager } from "../lib/gameDownload";
-import { ColdCacheSeal } from "../lib/seal";
+
 import { iglooTheme, iglooStyles } from "../theme";
 import {
   GameNFT,
@@ -250,10 +250,6 @@ export function SecureDownloadPage() {
 
       // Import Seal dependencies
       const { SessionKey } = await import("@mysten/seal");
-      const { ColdCacheSeal } = await import("../lib/seal");
-
-      // Initialize Seal service
-      const seal = new ColdCacheSeal(suiClient);
 
       // Create session key for secure download
       const sessionKey = await SessionKey.create({
