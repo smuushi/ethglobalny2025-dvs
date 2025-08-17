@@ -41,10 +41,10 @@ function App() {
               }}
             >
               <img
-                src="/cc_logo.PNG"
+                src="/logo_filled.png"
                 alt="ColdCache Logo"
                 style={{
-                  height: "80px",
+                  height: "104px",
                   width: "auto",
                   display: "inline-block",
                 }}

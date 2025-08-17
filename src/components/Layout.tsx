@@ -40,10 +40,10 @@ export function Layout({ children }: LayoutProps) {
                 }}
               >
                 <img
-                  src="/cc_logo.PNG"
+                  src="/logo_filled.png"
                   alt="ColdCache Logo"
                   style={{
-                    height: "40px",
+                    height: "52px",
                     width: "auto",
                     display: "block",
                   }}

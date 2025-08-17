@@ -64,10 +64,10 @@ export function HomePage() {
           }}
         >
           <img
-            src="/cc_logo.PNG"
+            src="/logo_transparent.png"
             alt="ColdCache Logo"
             style={{
-              height: "120px",
+              height: "256px",
               width: "auto",
               display: "inline-block",
             }}
@@ -313,7 +313,8 @@ export function HomePage() {
         style={{
           ...iglooStyles.card,
           background: iglooTheme.gradients.iceBlue,
-          padding: "48px",
+          padding: "clamp(32px, 8vw, 64px) clamp(24px, 6vw, 48px)",
+          margin: "0 clamp(16px, 4vw, 24px)",
           textAlign: "center",
           border: `2px solid ${iglooTheme.colors.primary[300]}`,
         }}

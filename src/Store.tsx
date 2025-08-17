@@ -45,6 +45,31 @@ export function Store() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Filter state
+  const [priceFilter, setPriceFilter] = useState<"all" | "free" | "paid">(
+    "all",
+  );
+  const [genreFilter, setGenreFilter] = useState<string>("all");
+
+  // Get unique genres from games
+  const uniqueGenres = [...new Set(games.map((game) => game.genre))].sort();
+
+  // Filter games based on current filters
+  const filteredGames = games.filter((game) => {
+    // Price filter
+    const priceMatch =
+      priceFilter === "all" ||
+      (priceFilter === "free" && game.price === 0) ||
+      (priceFilter === "paid" && game.price > 0);
+
+    // Genre filter
+    const genreMatch =
+      genreFilter === "all" ||
+      game.genre.toLowerCase() === genreFilter.toLowerCase();
+
+    return priceMatch && genreMatch;
+  });
+
   // Function to download cover image via CDN
   const downloadCoverImage = async (
     patchId: string,
@@ -628,24 +653,79 @@ export function Store() {
             <Button
               variant="soft"
               size="2"
-              style={{ background: iglooTheme.colors.primary[100] }}
+              onClick={() => setPriceFilter("free")}
+              style={{
+                background:
+                  priceFilter === "free"
+                    ? iglooTheme.colors.primary[200]
+                    : iglooTheme.colors.primary[100],
+                border:
+                  priceFilter === "free"
+                    ? `2px solid ${iglooTheme.colors.primary[400]}`
+                    : "2px solid transparent",
+              }}
             >
               🆓 Free
             </Button>
             <Button
               variant="soft"
               size="2"
-              style={{ background: iglooTheme.colors.ice[100] }}
+              onClick={() => setPriceFilter("paid")}
+              style={{
+                background:
+                  priceFilter === "paid"
+                    ? iglooTheme.colors.primary[200]
+                    : iglooTheme.colors.ice[100],
+                border:
+                  priceFilter === "paid"
+                    ? `2px solid ${iglooTheme.colors.primary[400]}`
+                    : "2px solid transparent",
+              }}
             >
               💰 Paid
             </Button>
             <Button
               variant="soft"
               size="2"
-              style={{ background: iglooTheme.colors.ice[100] }}
+              onClick={() => setPriceFilter("all")}
+              style={{
+                background:
+                  priceFilter === "all"
+                    ? iglooTheme.colors.primary[200]
+                    : iglooTheme.colors.ice[100],
+                border:
+                  priceFilter === "all"
+                    ? `2px solid ${iglooTheme.colors.primary[400]}`
+                    : "2px solid transparent",
+              }}
             >
-              🎮 All Genres
+              🎮 All Prices
             </Button>
+
+            {/* Genre Filter Dropdown */}
+            <select
+              value={genreFilter}
+              onChange={(e) => setGenreFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: iglooTheme.borderRadius.arch,
+                border: `1px solid ${iglooTheme.colors.ice[300]}`,
+                background:
+                  genreFilter === "all"
+                    ? iglooTheme.colors.ice[50]
+                    : iglooTheme.colors.primary[100],
+                color: iglooTheme.colors.primary[700],
+                fontSize: "14px",
+                fontWeight: "500",
+              }}
+            >
+              <option value="all">🎮 All Genres</option>
+              {uniqueGenres.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre.charAt(0).toUpperCase() + genre.slice(1)}
+                </option>
+              ))}
+            </select>
             <Flex ml="auto" gap="2" align="center">
               <Button
                 variant="soft"
@@ -674,109 +754,213 @@ export function Store() {
                   borderRadius: iglooTheme.borderRadius.arch,
                 }}
               >
-                {games.length} {games.length === 1 ? "Game" : "Games"}
+                {filteredGames.length} of {games.length}{" "}
+                {games.length === 1 ? "Game" : "Games"}
+                {(priceFilter !== "all" || genreFilter !== "all") &&
+                  " (filtered)"}
               </Badge>
             </Flex>
           </Flex>
         </Card>
       </Box>
 
-      <Grid columns={{ initial: "1", sm: "2", md: "3" }} gap="4">
-        {games.map((game) => (
-          <Link
-            key={game.id}
-            to={`/game/${game.id}`}
-            style={{ textDecoration: "none", color: "inherit" }}
+      {filteredGames.length === 0 ? (
+        <Card
+          style={{
+            ...iglooStyles.card,
+            padding: "48px",
+            textAlign: "center",
+            background: iglooTheme.gradients.frostWhite,
+          }}
+        >
+          <Text
+            size="6"
+            style={{
+              color: iglooTheme.colors.ice[400],
+              marginBottom: "16px",
+              display: "block",
+            }}
           >
-            <Card
-              size="2"
-              style={{
-                ...iglooStyles.card,
-                height: "100%",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = iglooTheme.shadows.igloo;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = iglooTheme.shadows.ice;
-              }}
+            🔍
+          </Text>
+          <Heading
+            size="5"
+            mb="2"
+            style={{ color: iglooTheme.colors.primary[700] }}
+          >
+            No games found
+          </Heading>
+          <Text size="3" color="gray" mb="4">
+            Try adjusting your filters to see more games.
+          </Text>
+          <Button
+            onClick={() => {
+              setPriceFilter("all");
+              setGenreFilter("all");
+            }}
+            style={iglooStyles.button.primary}
+          >
+            Clear Filters
+          </Button>
+        </Card>
+      ) : (
+        <Grid columns={{ initial: "1", sm: "2", md: "3" }} gap="4">
+          {filteredGames.map((game) => (
+            <Link
+              key={game.id}
+              to={`/game/${game.id}`}
+              style={{ textDecoration: "none", color: "inherit" }}
             >
-              {/* Cover Image Area with CDN Display */}
-              <Box
+              <Card
+                size="2"
                 style={{
-                  height: "150px",
-                  borderRadius: "6px 6px 0 0",
-                  marginBottom: "12px",
-                  position: "relative",
-                  overflow: "hidden",
+                  ...iglooStyles.card,
+                  height: "100%",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = iglooTheme.shadows.igloo;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = iglooTheme.shadows.ice;
                 }}
               >
-                {game.cover_image_blob_id &&
-                !game.cover_image_blob_id.startsWith("walrus_") ? (
-                  <>
-                    {/* Display cover image from CDN */}
-                    <img
-                      src={`https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${game.cover_image_blob_id}`}
-                      alt={`${game.title} cover`}
+                {/* Cover Image Area with CDN Display */}
+                <Box
+                  style={{
+                    height: "150px",
+                    borderRadius: "6px 6px 0 0",
+                    marginBottom: "12px",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  {game.cover_image_blob_id &&
+                  !game.cover_image_blob_id.startsWith("walrus_") ? (
+                    <>
+                      {/* Display cover image from CDN */}
+                      <img
+                        src={`https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${game.cover_image_blob_id}`}
+                        alt={`${game.title} cover`}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                        onError={(e) => {
+                          // Fallback to gradient background with title if image fails
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.style.background =
+                              "linear-gradient(135deg, var(--accent-9), var(--accent-7))";
+                            parent.style.display = "flex";
+                            parent.style.alignItems = "center";
+                            parent.style.justifyContent = "center";
+                            const fallbackText = document.createElement("div");
+                            fallbackText.textContent = game.title
+                              .slice(0, 2)
+                              .toUpperCase();
+                            fallbackText.style.color = "white";
+                            fallbackText.style.fontSize = "24px";
+                            fallbackText.style.fontWeight = "bold";
+                            parent.appendChild(fallbackText);
+                          }
+                        }}
+                      />
+                      {/* Small download button overlay */}
+                      <Button
+                        size="1"
+                        variant="soft"
+                        onClick={() =>
+                          downloadCoverImage(
+                            game.cover_image_blob_id,
+                            game.title,
+                            game,
+                          )
+                        }
+                        style={{
+                          position: "absolute",
+                          top: "8px",
+                          right: "8px",
+                          background: "rgba(0, 0, 0, 0.7)",
+                          color: "white",
+                          border: "none",
+                          padding: "4px 8px",
+                          fontSize: "10px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        ⬇️
+                      </Button>
+                      {/* Download Game File Button overlay */}
+                      {game.walrus_blob_id &&
+                        !game.walrus_blob_id.startsWith("walrus_") && (
+                          <Button
+                            size="1"
+                            variant="soft"
+                            onClick={() =>
+                              downloadGameFile(
+                                game.walrus_blob_id,
+                                game.title,
+                                game,
+                              )
+                            }
+                            style={{
+                              position: "absolute",
+                              bottom: "8px",
+                              right: "8px",
+                              background: "rgba(0, 0, 0, 0.7)",
+                              color: "white",
+                              border: "none",
+                              padding: "4px 8px",
+                              fontSize: "10px",
+                              borderRadius: "4px",
+                            }}
+                          >
+                            🎮
+                          </Button>
+                        )}
+                    </>
+                  ) : (
+                    // Fallback for games without cover images
+                    <Box
                       style={{
                         width: "100%",
                         height: "100%",
-                        objectFit: "cover",
-                      }}
-                      onError={(e) => {
-                        // Fallback to gradient background with title if image fails
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.style.background =
-                            "linear-gradient(135deg, var(--accent-9), var(--accent-7))";
-                          parent.style.display = "flex";
-                          parent.style.alignItems = "center";
-                          parent.style.justifyContent = "center";
-                          const fallbackText = document.createElement("div");
-                          fallbackText.textContent = game.title
-                            .slice(0, 2)
-                            .toUpperCase();
-                          fallbackText.style.color = "white";
-                          fallbackText.style.fontSize = "24px";
-                          fallbackText.style.fontWeight = "bold";
-                          parent.appendChild(fallbackText);
-                        }
-                      }}
-                    />
-                    {/* Small download button overlay */}
-                    <Button
-                      size="1"
-                      variant="soft"
-                      onClick={() =>
-                        downloadCoverImage(
-                          game.cover_image_blob_id,
-                          game.title,
-                          game,
-                        )
-                      }
-                      style={{
-                        position: "absolute",
-                        top: "8px",
-                        right: "8px",
-                        background: "rgba(0, 0, 0, 0.7)",
-                        color: "white",
-                        border: "none",
-                        padding: "4px 8px",
-                        fontSize: "10px",
-                        borderRadius: "4px",
+                        background:
+                          "linear-gradient(135deg, var(--accent-9), var(--accent-7))",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        position: "relative",
                       }}
                     >
-                      ⬇️
-                    </Button>
-                    {/* Download Game File Button overlay */}
-                    {game.walrus_blob_id &&
-                      !game.walrus_blob_id.startsWith("walrus_") && (
+                      <Text
+                        size="4"
+                        weight="bold"
+                        style={{ color: "white", marginBottom: "8px" }}
+                      >
+                        {game.title.slice(0, 2).toUpperCase()}
+                      </Text>
+                      <Text
+                        size="1"
+                        style={{
+                          color: "rgba(255, 255, 255, 0.7)",
+                          fontStyle: "italic",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        No Cover Image
+                      </Text>
+                      {/* Download Game File Button for games without cover */}
+                      {game.walrus_blob_id &&
+                      !game.walrus_blob_id.startsWith("walrus_") ? (
                         <Button
                           size="1"
                           variant="soft"
@@ -788,186 +972,126 @@ export function Store() {
                             )
                           }
                           style={{
-                            position: "absolute",
-                            bottom: "8px",
-                            right: "8px",
-                            background: "rgba(0, 0, 0, 0.7)",
+                            background: "rgba(255, 255, 255, 0.15)",
                             color: "white",
-                            border: "none",
+                            border: "1px solid rgba(255, 255, 255, 0.3)",
                             padding: "4px 8px",
                             fontSize: "10px",
-                            borderRadius: "4px",
                           }}
                         >
-                          🎮
+                          🎮 Download Game
                         </Button>
+                      ) : (
+                        <Text
+                          size="1"
+                          style={{ color: "rgba(255, 255, 255, 0.5)" }}
+                        >
+                          No Game File
+                        </Text>
                       )}
-                  </>
-                ) : (
-                  // Fallback for games without cover images
-                  <Box
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      background:
-                        "linear-gradient(135deg, var(--accent-9), var(--accent-7))",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                    }}
-                  >
-                    <Text
-                      size="4"
-                      weight="bold"
-                      style={{ color: "white", marginBottom: "8px" }}
-                    >
-                      {game.title.slice(0, 2).toUpperCase()}
-                    </Text>
-                    <Text
-                      size="1"
+                    </Box>
+                  )}
+                </Box>
+
+                <Flex
+                  direction="column"
+                  gap="2"
+                  style={{ padding: "0 12px 12px 12px" }}
+                >
+                  {/* Title and Genre */}
+                  <Flex justify="between" align="center">
+                    <Heading
+                      size="3"
                       style={{
-                        color: "rgba(255, 255, 255, 0.7)",
-                        fontStyle: "italic",
-                        marginBottom: "8px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                        marginRight: "8px",
                       }}
                     >
-                      No Cover Image
-                    </Text>
-                    {/* Download Game File Button for games without cover */}
-                    {game.walrus_blob_id &&
-                    !game.walrus_blob_id.startsWith("walrus_") ? (
-                      <Button
-                        size="1"
-                        variant="soft"
-                        onClick={() =>
-                          downloadGameFile(
-                            game.walrus_blob_id,
-                            game.title,
-                            game,
-                          )
-                        }
-                        style={{
-                          background: "rgba(255, 255, 255, 0.15)",
-                          color: "white",
-                          border: "1px solid rgba(255, 255, 255, 0.3)",
-                          padding: "4px 8px",
-                          fontSize: "10px",
-                        }}
-                      >
-                        🎮 Download Game
-                      </Button>
-                    ) : (
-                      <Text
-                        size="1"
-                        style={{ color: "rgba(255, 255, 255, 0.5)" }}
-                      >
-                        No Game File
-                      </Text>
-                    )}
-                  </Box>
-                )}
-              </Box>
+                      {game.title}
+                    </Heading>
+                    <Badge variant="soft" size="1">
+                      {game.genre}
+                    </Badge>
+                  </Flex>
 
-              <Flex
-                direction="column"
-                gap="2"
-                style={{ padding: "0 12px 12px 12px" }}
-              >
-                {/* Title and Genre */}
-                <Flex justify="between" align="center">
-                  <Heading
-                    size="3"
+                  {/* Description */}
+                  <Text
+                    size="2"
+                    color="gray"
                     style={{
                       overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      flex: 1,
-                      marginRight: "8px",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      lineHeight: "1.4",
+                      height: "2.8em",
                     }}
                   >
-                    {game.title}
-                  </Heading>
-                  <Badge variant="soft" size="1">
-                    {game.genre}
-                  </Badge>
-                </Flex>
+                    {game.description}
+                  </Text>
 
-                {/* Description */}
-                <Text
-                  size="2"
-                  color="gray"
-                  style={{
-                    overflow: "hidden",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    lineHeight: "1.4",
-                    height: "2.8em",
-                  }}
-                >
-                  {game.description}
-                </Text>
+                  {/* Publisher */}
+                  <Flex align="center" gap="2">
+                    <Avatar
+                      src=""
+                      fallback={game.publisher.slice(0, 2).toUpperCase()}
+                      size="1"
+                    />
+                    <Text size="1" color="gray">
+                      {formatAddress(game.publisher)}
+                    </Text>
+                  </Flex>
 
-                {/* Publisher */}
-                <Flex align="center" gap="2">
-                  <Avatar
-                    src=""
-                    fallback={game.publisher.slice(0, 2).toUpperCase()}
+                  {/* Stats */}
+                  <Flex justify="between" align="center" mt="2">
+                    <Text size="1" color="gray">
+                      {game.total_sales} sales
+                    </Text>
+                    <Text size="2" weight="bold">
+                      {formatPrice(game.price)} SUI
+                    </Text>
+                  </Flex>
+
+                  {/* Quick Action Button */}
+                  <Button
+                    size="3"
+                    style={{
+                      marginTop: "12px",
+                      ...iglooStyles.button.primary,
+                      background: iglooTheme.gradients.coolBlue,
+                      fontSize: "14px",
+                      fontWeight: "600",
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.location.href = `/game/${game.id}`;
+                    }}
+                  >
+                    🎮 View Details
+                  </Button>
+
+                  {/* Game ID for debugging */}
+                  <Text
                     size="1"
-                  />
-                  <Text size="1" color="gray">
-                    {formatAddress(game.publisher)}
+                    color="gray"
+                    style={{
+                      fontFamily: "monospace",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    ID: {game.id.slice(0, 20)}...
                   </Text>
                 </Flex>
-
-                {/* Stats */}
-                <Flex justify="between" align="center" mt="2">
-                  <Text size="1" color="gray">
-                    {game.total_sales} sales
-                  </Text>
-                  <Text size="2" weight="bold">
-                    {formatPrice(game.price)} SUI
-                  </Text>
-                </Flex>
-
-                {/* Quick Action Button */}
-                <Button
-                  size="3"
-                  style={{
-                    marginTop: "12px",
-                    ...iglooStyles.button.primary,
-                    background: iglooTheme.gradients.coolBlue,
-                    fontSize: "14px",
-                    fontWeight: "600",
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.location.href = `/game/${game.id}`;
-                  }}
-                >
-                  🎮 View Details
-                </Button>
-
-                {/* Game ID for debugging */}
-                <Text
-                  size="1"
-                  color="gray"
-                  style={{
-                    fontFamily: "monospace",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  ID: {game.id.slice(0, 20)}...
-                </Text>
-              </Flex>
-            </Card>
-          </Link>
-        ))}
-      </Grid>
+              </Card>
+            </Link>
+          ))}
+        </Grid>
+      )}
 
       {/* Debug Info */}
       <Box
