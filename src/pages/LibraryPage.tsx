@@ -129,25 +129,7 @@ export function LibraryPage() {
     }
   };
 
-  // Query to fetch game details from Game objects
-  const { data: gameObjects } = useSuiClientQuery(
-    "multiGetObjects",
-    {
-      ids:
-        gameStoreNFTs?.data
-          ?.map((nft) => nft.data?.content?.fields?.game_id)
-          .filter(Boolean) || [],
-      options: {
-        showContent: true,
-        showType: true,
-      },
-    },
-    {
-      enabled: !!gameStoreNFTs?.data?.length,
-    },
-  );
-
-  // Parse game store NFTs and determine if they are published or purchased games
+  // Parse enhanced game store NFTs with rich metadata
   const parseGameStoreNFT = (
     obj: any,
   ): (GameNFT & { isPublished: boolean }) | null => {
@@ -155,38 +137,30 @@ export function LibraryPage() {
       const fields = obj.data?.content?.fields;
       if (!fields) return null;
 
-      // Find the corresponding game object
-      const gameObject = gameObjects?.find(
-        (game) => game.data?.objectId === fields.game_id,
-      );
-      const gameFields = gameObject?.data?.content?.fields;
+      // Debug logging to understand the enhanced data structure
+      console.log("Enhanced NFT fields:", fields);
 
-      // Debug logging to understand the data structure
-      if (gameFields) {
-        console.log("Game fields found:", gameFields);
-      }
-
-      const isPublished = true; // All GameStore NFTs for current user are published games
+      const isPublished = fields.is_publisher_nft === true;
 
       return {
         id: obj.data.objectId,
         gameId: fields.game_id,
-        title: gameFields?.title || "Game " + fields.game_id.slice(-8),
-        description: gameFields?.description || "Published game description",
-        price: gameFields?.price?.toString() || "0",
-        publisher: gameFields?.publisher || currentAccount?.address || "",
-        walrusBlobId: gameFields?.walrus_blob_id || "",
+        title: fields.title || "Game " + fields.game_id.slice(-8),
+        description: fields.description || "Game description",
+        price: fields.price?.toString() || "0",
+        publisher: fields.publisher || currentAccount?.address || "",
+        walrusBlobId: fields.walrus_blob_id || "",
         sealPolicyId: "", // Would need Seal integration
-        coverImageBlobId: gameFields?.cover_image_blob_id || "",
-        genre: gameFields?.genre || "Unknown",
-        publishDate: gameFields?.publish_date || fields.purchase_date,
+        coverImageBlobId: fields.cover_image_blob_id || "",
+        genre: fields.genre || "Unknown",
+        publishDate: fields.publish_date || fields.purchase_date,
         owners: [fields.owner],
         mintDate: fields.purchase_date,
         currentOwner: fields.owner,
-        isPublished: true,
+        isPublished,
       };
     } catch (error) {
-      console.error("Error parsing GameStore NFT:", error);
+      console.error("Error parsing Enhanced GameStore NFT:", error);
       return null;
     }
   };

@@ -5,6 +5,8 @@ module game_store::game_store {
     use sui::object::{Self, UID, ID};
     use sui::tx_context::{Self, TxContext};
     use sui::event;
+    use sui::display;
+    use sui::package;
     use std::string::{Self, String};
     use std::vector;
 
@@ -12,6 +14,9 @@ module game_store::game_store {
     const EGameNotFound: u64 = 1;
     const ENotOwner: u64 = 2;
     const EGameNotActive: u64 = 3;
+
+    /// One-Time-Witness for the module
+    public struct GAME_STORE has drop {}
 
     public struct GameFileMetadata has store, copy, drop {
         original_filename: String,
@@ -40,8 +45,17 @@ module game_store::game_store {
     public struct GameNFT has key, store {
         id: UID,
         game_id: ID,
+        title: String,
+        description: String,
+        price: u64,
+        publisher: address,
+        walrus_blob_id: String,
+        cover_image_blob_id: String,
+        genre: String,
+        publish_date: u64,
         owner: address,
         purchase_date: u64,
+        is_publisher_nft: bool, // true for publisher, false for buyers
     }
 
     public struct GameStore has key {
@@ -73,7 +87,8 @@ module game_store::game_store {
         title: String,
     }
 
-    fun init(ctx: &mut TxContext) {
+    fun init(otw: GAME_STORE, ctx: &mut TxContext) {
+        // Create the GameStore
         let store = GameStore {
             id: object::new(ctx),
             admin: tx_context::sender(ctx),
@@ -81,6 +96,44 @@ module game_store::game_store {
             total_games: 0,
         };
         transfer::share_object(store);
+
+        // Set up Display for GameNFT with Walrus image URLs
+        let keys = vector[
+            std::string::utf8(b"name"),
+            std::string::utf8(b"description"),
+            std::string::utf8(b"image_url"),
+            std::string::utf8(b"project_url"),
+            std::string::utf8(b"creator"),
+            std::string::utf8(b"genre"),
+            std::string::utf8(b"game_file"),
+            std::string::utf8(b"price"),
+            std::string::utf8(b"is_publisher_nft"),
+        ];
+
+        let values = vector[
+            std::string::utf8(b"{title}"),
+            std::string::utf8(b"{description}"),
+            std::string::utf8(b"https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/{cover_image_blob_id}"),
+            std::string::utf8(b"https://coldcache.xyz"),
+            std::string::utf8(b"{publisher}"),
+            std::string::utf8(b"{genre}"),
+            std::string::utf8(b"https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/{walrus_blob_id}"),
+            std::string::utf8(b"{price} MIST"),
+            std::string::utf8(b"{is_publisher_nft}"),
+        ];
+
+        // Get the Publisher object
+        let publisher = package::claim(otw, ctx);
+        
+        // Create and set up display
+        let mut display = display::new_with_fields<GameNFT>(
+            &publisher, keys, values, ctx
+        );
+        
+        display::update_version(&mut display);
+        
+        transfer::public_transfer(publisher, tx_context::sender(ctx));
+        transfer::public_transfer(display, tx_context::sender(ctx));
     }
 
     public entry fun create_new_store(ctx: &mut TxContext) {
@@ -184,12 +237,21 @@ module game_store::game_store {
         vector::push_back(&mut store.games, game_id);
         store.total_games = store.total_games + 1;
 
-        // Mint NFT for the publisher
+        // Mint NFT for the publisher with complete game metadata
         let publisher_nft = GameNFT {
             id: object::new(ctx),
             game_id,
+            title: game.title,
+            description: game.description,
+            price: game.price,
+            publisher: game.publisher,
+            walrus_blob_id: game.walrus_blob_id,
+            cover_image_blob_id: game.cover_image_blob_id,
+            genre: game.genre,
+            publish_date: game.publish_date,
             owner: tx_context::sender(ctx),
             purchase_date: tx_context::epoch(ctx),
+            is_publisher_nft: true,
         };
 
         let nft_id = object::id(&publisher_nft);
@@ -228,8 +290,17 @@ module game_store::game_store {
         let nft = GameNFT {
             id: object::new(ctx),
             game_id: object::id(game),
+            title: game.title,
+            description: game.description,
+            price: game.price,
+            publisher: game.publisher,
+            walrus_blob_id: game.walrus_blob_id,
+            cover_image_blob_id: game.cover_image_blob_id,
+            genre: game.genre,
+            publish_date: game.publish_date,
             owner: tx_context::sender(ctx),
             purchase_date: tx_context::epoch(ctx),
+            is_publisher_nft: false,
         };
 
         let nft_id = object::id(&nft);
@@ -303,6 +374,25 @@ module game_store::game_store {
 
     public fun get_nft_info(nft: &GameNFT): (ID, address, u64) {
         (nft.game_id, nft.owner, nft.purchase_date)
+    }
+
+    public fun get_enhanced_nft_info(nft: &GameNFT): (
+        ID, String, String, u64, address, String, String, String, u64, address, u64, bool
+    ) {
+        (
+            nft.game_id,
+            nft.title,
+            nft.description,
+            nft.price,
+            nft.publisher,
+            nft.walrus_blob_id,
+            nft.cover_image_blob_id,
+            nft.genre,
+            nft.publish_date,
+            nft.owner,
+            nft.purchase_date,
+            nft.is_publisher_nft
+        )
     }
 
     public fun get_store_stats(store: &GameStore): (address, u64) {

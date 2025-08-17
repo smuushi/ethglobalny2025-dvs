@@ -9,14 +9,14 @@ export const TESTNET_NFT_PACKAGE_ID =
   "0x269789a9a66ea57fda7bcb252d355721369c2c8f51dc2f25241e8c279d7741c9";
 export const MAINNET_NFT_PACKAGE_ID = "0xTODO";
 
-// Game Store Package IDs (FIXED VERSION - no unused value error)
+// Game Store Package IDs (DISPLAY STANDARD - Marketplace compatible NFTs)
 export const DEVNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 export const TESTNET_GAME_STORE_PACKAGE_ID =
-  "0xbe49bf3340674270b149f80ce0ca6db9c7319c727352d26b1fd8a57c63a9692e";
+  "0x6d751a9d36eb726243d6248bf2b86b0c2401dd1d76ed297bd264e0433b5298d9";
 export const MAINNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 
-// GameStore shared object IDs (FIXED VERSION)
+// GameStore shared object IDs (DISPLAY STANDARD)
 export const DEVNET_GAME_STORE_OBJECT_ID = "0xTODO";
 export const TESTNET_GAME_STORE_OBJECT_ID =
-  "0x57ad1d1019611522559496bf2d0d3dcb68bfdb9f368f5472e0442c45d0436026";
+  "0xaf145cee151b70726e6e749c5a51b7eda17feaae408103cf79a25991ddf940c0";
 export const MAINNET_GAME_STORE_OBJECT_ID = "0xTODO";
