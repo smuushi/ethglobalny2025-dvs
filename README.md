@@ -852,25 +852,39 @@ for details.
 
 ## 🙏 **Special Thanks**
 
-Special thanks to **@DanTheMan8300** (Developer Relations Engineer at Mysten Labs) for helping debug and getting us excited to build on Sui! 
+Special thanks to **@DanTheMan8300** (Developer Relations Engineer at Mysten
+Labs) for helping debug and getting us excited to build on Sui!
 
 ---
 
 ## 🚀 **Future Vision**
 
-Our hope is that a storefront pushing NFT games will inspire people and game developers to build on top of people's existing wallets that they now have - creating **proof of ownership in games** since everyone has a wallet, allowing us to avoid intrusive DRMs.
+Our hope is that a storefront pushing NFT games will inspire people and game
+developers to build on top of people's existing wallets that they now have -
+creating **proof of ownership in games** since everyone has a wallet, allowing
+us to avoid intrusive DRMs.
 
 ### **🎮 Wallet-Native Gaming Ecosystem**
 
 With true NFT ownership established, we envision:
 
-- **📚 Personal Game Libraries**: Users can build out personal lending systems for their game collections, sharing titles with friends and family through smart contracts
-- **🏪 Personal Marketplaces**: Individual collectors can create their own storefronts, curating and reselling their game collections with custom pricing and bundles
-- **🤝 Community Sharing**: Digital game libraries that work like traditional libraries - communities can pool resources, share collections, and provide access to games for educational or social purposes
-- **🔄 Dynamic Ownership**: Games that can be temporarily transferred, loaned, or shared while maintaining permanent ownership records
-- **🎯 DRM-Free Future**: Wallet-based ownership eliminates the need for invasive DRM systems, creating a more open and user-friendly gaming experience
+- **📚 Personal Game Libraries**: Users can build out personal lending systems
+  for their game collections, sharing titles with friends and family through
+  smart contracts
+- **🏪 Personal Marketplaces**: Individual collectors can create their own
+  storefronts, curating and reselling their game collections with custom pricing
+  and bundles
+- **🤝 Community Sharing**: Digital game libraries that work like traditional
+  libraries - communities can pool resources, share collections, and provide
+  access to games for educational or social purposes
+- **🔄 Dynamic Ownership**: Games that can be temporarily transferred, loaned,
+  or shared while maintaining permanent ownership records
+- **🎯 DRM-Free Future**: Wallet-based ownership eliminates the need for
+  invasive DRM systems, creating a more open and user-friendly gaming experience
 
-This represents a fundamental shift from platform-controlled game ownership to truly user-owned digital assets that can be freely shared, traded, and enjoyed across communities.
+This represents a fundamental shift from platform-controlled game ownership to
+truly user-owned digital assets that can be freely shared, traded, and enjoyed
+across communities.
 
 ---
 
