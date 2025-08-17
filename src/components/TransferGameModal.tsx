@@ -10,7 +10,7 @@ import {
   TextField,
   Spinner,
 } from "@radix-ui/themes";
-import { useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { iglooTheme, iglooStyles } from "../theme";
 import { GameNFT } from "../schemas/nft";
@@ -33,7 +33,6 @@ export function TransferGameModal({
   const [error, setError] = useState<string | null>(null);
 
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
-  const suiClient = useSuiClient();
 
   const handleTransfer = async () => {
     if (!recipientAddress.trim()) {
@@ -101,7 +100,7 @@ export function TransferGameModal({
           boxShadow: iglooTheme.shadows.igloo,
         }}
       >
-        <Dialog.Title asChild>
+        <Dialog.Title>
           <Heading
             size="6"
             style={{

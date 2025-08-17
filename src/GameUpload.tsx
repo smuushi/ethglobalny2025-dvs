@@ -90,7 +90,7 @@ export function GameUpload() {
       );
 
       let gameData: ArrayBuffer;
-      let encryptedBytes: ArrayBuffer;
+      let encryptedBytes: Uint8Array;
 
       if (gameFile.size > 100 * 1024 * 1024) {
         // For files > 100MB
