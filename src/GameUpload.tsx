@@ -2,11 +2,10 @@ import { useState } from "react";
 import {
   useSignAndExecuteTransaction,
   useCurrentAccount,
-  useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { WalrusClient, WalrusFile } from "@mysten/walrus";
-import walrusWasmUrl from "@mysten/walrus-wasm/web/walrus_wasm_bg.wasm?url";
+import { WalrusFile } from "@mysten/walrus";
+import { walrusClient } from "./lib/walrus";
 import { fileTypeFromBuffer } from "file-type";
 import {
   Button,
@@ -37,7 +36,6 @@ export function GameUpload() {
   const currentAccount = useCurrentAccount();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const gameStoreObjectId = useNetworkVariable("gameStoreObjectId");
-  const suiClient = useSuiClient();
 
   const [metadata, setMetadata] = useState<GameMetadata>({
     title: "",
@@ -62,29 +60,6 @@ export function GameUpload() {
 
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
-
-  // Initialize Walrus client using the experimental extension pattern
-  const walrusClient = suiClient.$extend(
-    WalrusClient.experimental_asClientExtension({
-      network: "testnet",
-      wasmUrl: walrusWasmUrl,
-      storageNodeClientOptions: {
-        timeout: 60_000,
-        onError: (error: Error) => {
-          console.error(`🚨 Walrus Storage Node Error:`, {
-            error: error.message || error,
-            timestamp: new Date().toISOString(),
-          });
-        },
-      },
-      uploadRelay: {
-        host: "https://upload-relay.testnet.walrus.space",
-        sendTip: {
-          max: 1_000,
-        },
-      },
-    }),
-  );
 
   // Helper function to get the correct file extension based on MIME type
   const getFileExtension = (file: File): string => {
@@ -167,7 +142,7 @@ export function GameUpload() {
     file: File,
     identifier: string,
     retryCount: number = 0,
-  ): Promise<{ blobId: string; actualSize: number }> => {
+  ): Promise<{ blobId: string; patchId: string; actualSize: number }> => {
     if (!currentAccount) {
       throw new Error("Wallet not connected");
     }
@@ -235,10 +210,13 @@ export function GameUpload() {
         }
       }
 
-      // Minimal WalrusFile creation - remove all tags to test
+      // Use Uint8Array conversion like the working example
       const walrusFile = WalrusFile.from({
-        contents: file, // Use File directly (extends Blob)
+        contents: new Uint8Array(await file.arrayBuffer()),
         identifier: file.name,
+        tags: {
+          contentType: file.type,
+        },
       });
 
       console.log(`📦 Created minimal WalrusFile for ${file.name}`, {
@@ -251,7 +229,7 @@ export function GameUpload() {
       console.log(`🔄 Starting Walrus upload flow...`);
       const uploadStart = Date.now();
 
-      const flow = walrusClient.walrus.writeFilesFlow({
+      const flow = walrusClient.writeFilesFlow({
         files: [walrusFile],
       });
 
@@ -267,26 +245,27 @@ export function GameUpload() {
         deletable: false,
       });
 
-      // Sign and execute the register transaction
-      console.log(`✍️ Signing register transaction...`);
+      // Sign and execute the register transaction FIRST to reserve space
+      console.log(`✍️ Signing register transaction to reserve space...`);
       const registerResult = await new Promise<any>((resolve, reject) => {
         signAndExecute(
           { transaction: registerTx },
           {
             onSuccess: (result) => {
-              console.log(`✅ Register transaction successful:`, result.digest);
+              console.log(`✅ Space registered successfully:`, result.digest);
               resolve(result);
             },
             onError: (error) => {
-              console.error(`❌ Register transaction failed:`, error);
+              console.error(`❌ Space registration failed:`, error);
               reject(error);
             },
           },
         );
       });
 
-      // Upload the data to storage nodes
-      console.log(`☁️ Uploading to Walrus storage nodes...`);
+      // Now upload the data to storage nodes using the registered digest
+      console.log(`☁️ Uploading file data to Walrus storage nodes...`);
+      console.log(`🔗 Using registered digest: ${registerResult.digest}`);
       await flow.upload({
         digest: registerResult.digest,
       });
@@ -311,6 +290,10 @@ export function GameUpload() {
         );
       });
 
+      // Wait 25 seconds to ensure all files are fully processed
+      console.log(`⏳ Waiting 25 seconds for file processing to complete...`);
+      await new Promise((resolve) => setTimeout(resolve, 25000));
+
       // Get the final blob ID
       const files = await flow.listFiles();
       if (files.length === 0) {
@@ -318,30 +301,26 @@ export function GameUpload() {
       }
 
       console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
 
-      const blobId = files[0].blobId;
+      const uploadedFile = files[0];
+      const blobId = uploadedFile.blobId;
+      const patchId = uploadedFile.id; // This is the QuiltPatchId we need for downloading
 
       console.log(`✅ Upload completed in ${Date.now() - uploadStart}ms`, {
         blobId,
+        patchId,
         identifier,
         retryCount,
       });
       console.log(`🎉 Walrus upload complete!`, {
         blobId,
+        patchId,
         identifier,
         retryCount,
         fileSize: file.size,
       });
 
-      return { blobId, actualSize: file.size };
+      return { blobId, patchId, actualSize: file.size };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -415,7 +394,8 @@ export function GameUpload() {
         metadata.gameFile,
         `${metadata.title}${gameExtension}`,
       );
-      const gameWalrusId = gameUploadResult.blobId;
+      const gameWalrusId = gameUploadResult.patchId; // Use patchId for downloading
+      const gameBlobId = gameUploadResult.blobId;
       const actualGameFileSize = gameUploadResult.actualSize;
 
       setUploadProgress({
@@ -440,7 +420,7 @@ export function GameUpload() {
           metadata.coverImage,
           `${metadata.title}_cover${coverExtension}`,
         );
-        coverImageWalrusId = coverUploadResult.blobId;
+        coverImageWalrusId = coverUploadResult.patchId; // Use patchId for downloading
       }
 
       setUploadProgress({
@@ -467,11 +447,14 @@ export function GameUpload() {
           originalSize: metadata.gameFile.size,
           actualUploadedSize: actualGameFileSize,
           type: gameContentType,
+          patchId: gameWalrusId, // QuiltPatchId for downloading
+          blobId: gameBlobId, // Base blob ID
         },
         coverImage: {
           name: coverFileName,
           size: coverFileSize,
           type: coverContentType,
+          patchId: coverImageWalrusId, // QuiltPatchId for downloading
         },
       });
 
