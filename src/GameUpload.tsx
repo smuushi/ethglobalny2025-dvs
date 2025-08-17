@@ -61,32 +61,6 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-<<<<<<< HEAD
-=======
-  // Initialize Walrus client using the experimental extension pattern
-  const walrusClient = suiClient.$extend(
-    WalrusClient.experimental_asClientExtension({
-      network: "testnet",
-      wasmUrl: walrusWasmUrl,
-      storageNodeClientOptions: {
-        timeout: 60_000,
-        onError: (error: Error) => {
-          console.error(`🚨 Walrus Storage Node Error:`, {
-            error: error.message || error,
-            timestamp: new Date().toISOString(),
-          });
-        },
-      },
-      uploadRelay: {
-        host: "https://upload-relay.testnet.walrus.space",
-        sendTip: {
-          max: 1_000,
-        },
-      },
-    }),
-  );
-
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
   // Helper function to get the correct file extension based on MIME type
   const getFileExtension = (file: File): string => {
     const mimeType = file.type.toLowerCase();
@@ -168,11 +142,7 @@ export function GameUpload() {
     file: File,
     identifier: string,
     retryCount: number = 0,
-<<<<<<< HEAD
   ): Promise<{ blobId: string; patchId: string; actualSize: number }> => {
-=======
-  ): Promise<{ blobId: string; actualSize: number }> => {
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
     if (!currentAccount) {
       throw new Error("Wallet not connected");
     }
@@ -240,7 +210,6 @@ export function GameUpload() {
         }
       }
 
-<<<<<<< HEAD
       // Use Uint8Array conversion like the working example
       const walrusFile = WalrusFile.from({
         contents: new Uint8Array(await file.arrayBuffer()),
@@ -248,12 +217,6 @@ export function GameUpload() {
         tags: {
           contentType: file.type,
         },
-=======
-      // Minimal WalrusFile creation - remove all tags to test
-      const walrusFile = WalrusFile.from({
-        contents: file, // Use File directly (extends Blob)
-        identifier: file.name,
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
       });
 
       console.log(`📦 Created minimal WalrusFile for ${file.name}`, {
@@ -261,21 +224,12 @@ export function GameUpload() {
         fileSize: file.size,
         fileType: file.type,
       });
-<<<<<<< HEAD
 
       // Use writeFilesFlow for browser wallet compatibility
       console.log(`🔄 Starting Walrus upload flow...`);
       const uploadStart = Date.now();
 
       const flow = walrusClient.writeFilesFlow({
-=======
-
-      // Use writeFilesFlow for browser wallet compatibility
-      console.log(`🔄 Starting Walrus upload flow...`);
-      const uploadStart = Date.now();
-
-      const flow = walrusClient.walrus.writeFilesFlow({
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
         files: [walrusFile],
       });
 
@@ -347,7 +301,6 @@ export function GameUpload() {
       }
 
       console.log(`🔍 Files uploaded:`, files);
-<<<<<<< HEAD
 
       const uploadedFile = files[0];
       const blobId = uploadedFile.blobId;
@@ -356,40 +309,18 @@ export function GameUpload() {
       console.log(`✅ Upload completed in ${Date.now() - uploadStart}ms`, {
         blobId,
         patchId,
-=======
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-      console.log(`🔍 Files uploaded:`, files);
-
-      const blobId = files[0].blobId;
-
-      console.log(`✅ Upload completed in ${Date.now() - uploadStart}ms`, {
-        blobId,
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
         identifier,
         retryCount,
       });
       console.log(`🎉 Walrus upload complete!`, {
         blobId,
-<<<<<<< HEAD
         patchId,
-=======
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
         identifier,
         retryCount,
         fileSize: file.size,
       });
 
-<<<<<<< HEAD
       return { blobId, patchId, actualSize: file.size };
-=======
-      return { blobId, actualSize: file.size };
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
@@ -463,12 +394,8 @@ export function GameUpload() {
         metadata.gameFile,
         `${metadata.title}${gameExtension}`,
       );
-<<<<<<< HEAD
       const gameWalrusId = gameUploadResult.patchId; // Use patchId for downloading
       const gameBlobId = gameUploadResult.blobId;
-=======
-      const gameWalrusId = gameUploadResult.blobId;
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
       const actualGameFileSize = gameUploadResult.actualSize;
 
       setUploadProgress({
@@ -493,11 +420,7 @@ export function GameUpload() {
           metadata.coverImage,
           `${metadata.title}_cover${coverExtension}`,
         );
-<<<<<<< HEAD
         coverImageWalrusId = coverUploadResult.patchId; // Use patchId for downloading
-=======
-        coverImageWalrusId = coverUploadResult.blobId;
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
       }
 
       setUploadProgress({
@@ -524,20 +447,14 @@ export function GameUpload() {
           originalSize: metadata.gameFile.size,
           actualUploadedSize: actualGameFileSize,
           type: gameContentType,
-<<<<<<< HEAD
           patchId: gameWalrusId, // QuiltPatchId for downloading
           blobId: gameBlobId, // Base blob ID
-=======
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
         },
         coverImage: {
           name: coverFileName,
           size: coverFileSize,
           type: coverContentType,
-<<<<<<< HEAD
           patchId: coverImageWalrusId, // QuiltPatchId for downloading
-=======
->>>>>>> 4df00e4 (Enhance GameStore module with new GameFileMetadata struct for improved file handling; update GameUpload and Store components to utilize enhanced metadata during uploads and downloads. Update Move.lock and constants for new published IDs.)
         },
       });
 
