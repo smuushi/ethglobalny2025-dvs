@@ -22,6 +22,82 @@ rights. Built on Sui blockchain with Walrus storage integration.
 - **Resale Rights**: NFT ownership enables peer-to-peer game transfers
 - **Developer Friendly**: Minimal platform fees, just gas costs
 
+## 🏗️ Architectural Guarantees & Tokenomics
+
+### Permanent Ownership Architecture
+
+**Every game purchase mints an NFT that proves ownership forever. Your games are
+stored on decentralized infrastructure, guaranteeing uninterrupted access.**
+
+#### Technical Implementation:
+
+- **Smart Contract Minting**: When a player purchases a game, our Sui smart
+  contract automatically mints a unique NFT to their wallet
+- **Cryptographic Proof**: The NFT serves as cryptographic proof of ownership
+  that cannot be revoked by any central authority
+- **Decentralized Storage**: Game files are encrypted and stored on Walrus
+  decentralized storage network with global redundancy
+- **Token-Gated Access**: Seal encryption ensures only NFT owners can decrypt
+  and access their purchased games
+
+### Revolutionary Tokenomics Model
+
+#### Traditional Platforms vs ColdCache
+
+**Traditional Gaming Platforms (Steam, Epic, etc.):**
+
+- Platform Fee: 30% of all sales
+- Payment Processing: 2-3% additional fees
+- Developer Revenue: ~67% of sale price
+- Player Rights: No resale, platform controls access
+
+**ColdCache Platform:**
+
+- Platform Fee: 0% of sales
+- Blockchain Gas Fees: ~$0.01 per transaction
+- Developer Revenue: ~100% of sale price
+- Player Rights: Full ownership with resale capabilities
+
+#### Fund Distribution Flow
+
+1. **Direct Publisher Payments**: 100% of game sale proceeds flow directly to
+   publishers via blockchain transaction
+2. **Publisher Allocation**: Publishers can choose to allocate portions of their
+   revenue toward:
+   - Development costs
+   - Marketing
+   - Data permanence on Walrus storage (optional)
+   - Community rewards
+3. **Storage Permanence**: Publishers can optionally fund extended Walrus
+   storage to guarantee eternal game availability
+4. **No Middleman**: Payments are instant and direct, eliminating traditional
+   payment processor delays and fees
+
+### Decentralized Infrastructure Stack
+
+#### Layer 1: Sui Blockchain
+
+- **Smart Contracts**: Enforce ownership rights and automate payment
+  distribution
+- **NFT Standard**: Enhanced GameNFT with Sui Display standard for marketplace
+  compatibility
+- **Immutable Records**: All ownership transfers and transactions permanently
+  recorded
+
+#### Layer 2: Walrus Storage Network
+
+- **Decentralized Storage**: Games stored across multiple nodes for redundancy
+- **Censorship Resistance**: No single point of failure or control
+- **Global CDN**: Fast download speeds worldwide through distributed network
+- **Permanent Availability**: Games remain accessible even if original publisher
+  disappears
+
+#### Layer 3: Seal Encryption
+
+- **Token-Gated Access**: Only NFT owners can decrypt game files
+- **Session Key Management**: Secure key derivation for download sessions
+- **Smart Contract Integration**: On-chain verification before access grants
+
 ## Architecture Overview
 
 ```

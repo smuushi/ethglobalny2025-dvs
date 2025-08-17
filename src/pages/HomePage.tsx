@@ -124,19 +124,34 @@ export function HomePage() {
           </Text>
         </Flex>
 
-        <Link to="/store" style={{ textDecoration: "none" }}>
-          <Button
-            size="4"
-            style={{
-              ...iglooStyles.button.primary,
-              fontSize: "18px",
-              padding: "16px 32px",
-              boxShadow: iglooTheme.shadows.ice,
-            }}
-          >
-            🏠 Browse Games
-          </Button>
-        </Link>
+        <Flex gap="4" justify="center">
+          <Link to="/store" style={{ textDecoration: "none" }}>
+            <Button
+              size="4"
+              style={{
+                ...iglooStyles.button.primary,
+                fontSize: "18px",
+                padding: "16px 32px",
+                boxShadow: iglooTheme.shadows.ice,
+              }}
+            >
+              🏠 Browse Games
+            </Button>
+          </Link>
+          <Link to="/about" style={{ textDecoration: "none" }}>
+            <Button
+              size="4"
+              style={{
+                ...iglooStyles.button.secondary,
+                fontSize: "18px",
+                padding: "16px 32px",
+                boxShadow: iglooTheme.shadows.ice,
+              }}
+            >
+              About ColdCache
+            </Button>
+          </Link>
+        </Flex>
       </Box>
 
       {/* Mission Statement */}
