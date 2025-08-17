@@ -7,6 +7,7 @@ import { StorePage } from "./pages/StorePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { PublishPage } from "./pages/PublishPage";
 import { GameDetailPage } from "./pages/GameDetailPage";
+import { SecureDownloadPage } from "./pages/SecureDownloadPage";
 import { iglooTheme, iglooStyles } from "./theme";
 
 function App() {
@@ -123,6 +124,7 @@ function App() {
           <Route path="/game/:gameId" element={<GameDetailPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/publish" element={<PublishPage />} />
+          <Route path="/download/:gameId" element={<SecureDownloadPage />} />
         </Routes>
       </Layout>
     </Router>

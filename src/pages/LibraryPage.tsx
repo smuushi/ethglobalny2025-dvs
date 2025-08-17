@@ -10,16 +10,14 @@ import {
   Badge,
   Spinner,
   Avatar,
-  Progress,
   Tabs,
 } from "@radix-ui/themes";
-import {
-  useCurrentAccount,
-  useSuiClientQuery,
-  useSuiClient,
-} from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClientQuery } from "@mysten/dapp-kit";
 import { useNetworkVariable } from "../networkConfig";
-import { GameDownloadManager } from "../lib/gameDownload";
+import {
+  generateSecureDownloadUrl,
+  logSecureDownloadAttempt,
+} from "../lib/secureDownload";
 import { iglooTheme, iglooStyles } from "../theme";
 import {
   GameNFT,
@@ -29,21 +27,10 @@ import {
   formatTimestamp,
 } from "../schemas/nft";
 
-interface DownloadState {
-  gameId: string;
-  stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
-  progress: number;
-  message: string;
-}
-
 export function LibraryPage() {
   const currentAccount = useCurrentAccount();
-  const suiClient = useSuiClient();
   const nftPackageId = useNetworkVariable("nftPackageId");
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
-  const [downloadState, setDownloadState] = useState<DownloadState | null>(
-    null,
-  );
 
   // Query for owned NFTs from the standalone NFT contract
   const {
@@ -120,65 +107,24 @@ export function LibraryPage() {
         (nft): nft is GameNFT & { isPublished: boolean } => nft !== null,
       ) || [];
 
-  const handleDownloadGame = async (game: GameNFT) => {
-    if (!currentAccount?.address) return;
-
-    try {
-      const downloadManager = new GameDownloadManager(
-        suiClient,
-        currentAccount.address,
-      );
-
-      const gameBlob = await downloadManager.downloadGame(game, (progress) => {
-        setDownloadState({
-          gameId: game.id,
-          stage: progress.stage,
-          progress: progress.progress,
-          message: progress.message,
-        });
-      });
-
-      // Trigger browser download
-      const filename = game.title
-        ? `${game.title.replace(/[^a-zA-Z0-9]/g, "_")}.zip`
-        : "game.zip";
-
-      GameDownloadManager.triggerDownload(gameBlob, filename);
-
-      // Show success message
-      alert(
-        `🎮 ${game.title} downloaded successfully!\n\nFile: ${filename}\n\nYour game has been saved to your Downloads folder.`,
-      );
-
-      setDownloadState(null);
-    } catch (error) {
-      console.error("Download failed:", error);
-
-      // Show specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes("do not own this game")) {
-          alert(
-            `❌ Access Denied\n\nYou need to own the NFT for "${game.title}" to download it.\n\nPurchase the game first, then try downloading again.`,
-          );
-        } else if (error.message.includes("Invalid Walrus blob ID")) {
-          alert(
-            `⚠️ Download Unavailable\n\nThe game file for "${game.title}" is not available for download.\n\nThis may be because:\n• The file wasn't uploaded correctly\n• The Walrus blob ID is invalid\n\nContact the game publisher for support.`,
-          );
-        } else if (error.message.includes("Failed to download from Walrus")) {
-          alert(
-            `📡 Download Failed\n\nCouldn't download "${game.title}" from Walrus storage.\n\nPlease check your internet connection and try again.`,
-          );
-        } else {
-          alert(
-            `❌ Download Error\n\n${error.message}\n\nPlease try again or contact support if the problem persists.`,
-          );
-        }
-      } else {
-        alert("Download failed. Please try again.");
-      }
-
-      setDownloadState(null);
+  const handleSecureDownload = (game: GameNFT) => {
+    if (!currentAccount?.address) {
+      logSecureDownloadAttempt(game.id, null, false, "No wallet connected");
+      alert("Please connect your wallet to download games.");
+      return;
     }
+
+    // Log the secure download attempt
+    logSecureDownloadAttempt(
+      game.id,
+      currentAccount.address,
+      true,
+      "Redirecting to secure download",
+    );
+
+    // Generate secure download URL and redirect
+    const secureUrl = generateSecureDownloadUrl(game);
+    window.location.href = secureUrl;
   };
 
   // Helper functions are now imported from schema file
@@ -369,40 +315,30 @@ export function LibraryPage() {
                 </Box>
 
                 <Box>
-                  {downloadState?.gameId === game.id ? (
-                    <Box>
-                      <Flex justify="between" align="center" mb="2">
-                        <Text
-                          size="2"
-                          style={{ color: iglooTheme.colors.ice[600] }}
-                        >
-                          {downloadState.message}
-                        </Text>
-                        <Text
-                          size="1"
-                          style={{ color: iglooTheme.colors.ice[500] }}
-                        >
-                          {downloadState.progress}%
-                        </Text>
-                      </Flex>
-                      <Progress value={downloadState.progress} size="2" />
-                    </Box>
-                  ) : (
-                    <Button
-                      size="3"
-                      style={{
-                        width: "100%",
-                        background: iglooTheme.gradients.coolBlue,
-                        border: "none",
-                        borderRadius: iglooTheme.borderRadius.arch,
-                        fontWeight: "600",
-                      }}
-                      onClick={() => handleDownloadGame(game)}
-                      disabled={downloadState !== null}
-                    >
-                      ⬇️ Download Game
-                    </Button>
-                  )}
+                  <Button
+                    size="3"
+                    style={{
+                      width: "100%",
+                      background: iglooTheme.gradients.coolBlue,
+                      border: "none",
+                      borderRadius: iglooTheme.borderRadius.arch,
+                      fontWeight: "600",
+                    }}
+                    onClick={() => handleSecureDownload(game)}
+                  >
+                    🔐 Secure Download
+                  </Button>
+                  <Text
+                    size="1"
+                    style={{
+                      color: iglooTheme.colors.ice[500],
+                      textAlign: "center",
+                      marginTop: "8px",
+                      display: "block",
+                    }}
+                  >
+                    Blockchain-verified access required
+                  </Text>
                 </Box>
 
                 <Box mt="3">

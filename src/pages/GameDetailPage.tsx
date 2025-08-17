@@ -20,7 +20,10 @@ import {
 } from "@radix-ui/themes";
 import { useNetworkVariable } from "../networkConfig";
 import { iglooTheme, iglooStyles } from "../theme";
-import { GameDownloadManager } from "../lib/gameDownload";
+import {
+  generateSecureDownloadUrl,
+  logSecureDownloadAttempt,
+} from "../lib/secureDownload";
 
 interface Game {
   id: string;
@@ -44,7 +47,6 @@ interface PurchaseModalProps {
 
 function PurchaseModal({ game, isOpen, onClose }: PurchaseModalProps) {
   const [step, setStep] = useState<"amount" | "confirm" | "status">("amount");
-  const [amount, setAmount] = useState(game.price);
   const [status, setStatus] = useState<"pending" | "success" | "error">(
     "pending",
   );
@@ -316,71 +318,48 @@ export function GameDetailPage() {
     return `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${blobId}`;
   };
 
-  const handleDownloadGame = async () => {
-    if (!currentAccount?.address || !gameData?.data) return;
-
-    setIsDownloading(true);
-    setDownloadProgress(null);
-
-    try {
-      const downloadManager = new GameDownloadManager(
-        suiClient,
-        currentAccount.address,
+  const handleSecureDownload = () => {
+    if (!currentAccount?.address || !game) {
+      logSecureDownloadAttempt(
+        game?.id || "unknown",
+        null,
+        false,
+        "No wallet connected",
       );
-
-      // Convert game data to the format expected by GameDownloadManager
-      const gameNFT = {
-        id: game.id,
-        gameId: game.id,
-        title: game.title,
-        walrusBlobId: game.walrus_blob_id,
-        sealPolicyId: game.cover_image_blob_id, // Placeholder - actual seal policy would be different
-        currentOwner: currentAccount.address,
-      };
-
-      const gameBlob = await downloadManager.downloadGame(
-        gameNFT,
-        (progress) => {
-          setDownloadProgress({
-            stage: progress.stage,
-            progress: progress.progress,
-            message: progress.message,
-          });
-        },
-      );
-
-      // Trigger browser download
-      const filename = game.title
-        ? `${game.title.replace(/[^a-zA-Z0-9]/g, "_")}.zip`
-        : "game.zip";
-
-      GameDownloadManager.triggerDownload(gameBlob, filename);
-
-      // Show success message
-      alert(
-        `🎮 ${game.title} downloaded successfully!\n\nFile: ${filename}\n\nYour game has been saved to your Downloads folder.`,
-      );
-    } catch (error) {
-      console.error("Download failed:", error);
-
-      // Show specific error messages
-      if (error instanceof Error) {
-        if (error.message.includes("do not own this game")) {
-          alert(
-            `❌ Access Denied\n\nYou need to own the NFT for "${game.title}" to download it.\n\nPurchase the game first, then try downloading again.`,
-          );
-        } else {
-          alert(
-            `❌ Download Error\n\n${error.message}\n\nPlease try again or contact support if the problem persists.`,
-          );
-        }
-      } else {
-        alert("Download failed. Please try again.");
-      }
-    } finally {
-      setIsDownloading(false);
-      setDownloadProgress(null);
+      alert("Please connect your wallet to download games.");
+      return;
     }
+
+    // Convert game data to the format expected by secure download
+    const gameNFT = {
+      id: game.id,
+      gameId: game.id,
+      title: game.title,
+      description: game.description,
+      price: game.price.toString(),
+      publisher: game.publisher,
+      walrusBlobId: game.walrus_blob_id,
+      sealPolicyId: game.cover_image_blob_id, // Placeholder
+      coverImageBlobId: game.cover_image_blob_id,
+      genre: game.genre,
+      publishDate: game.publish_date.toString(),
+      owners: [currentAccount.address],
+      mintDate: game.publish_date.toString(),
+      currentOwner: currentAccount.address,
+      isPublished: false,
+    };
+
+    // Log the secure download attempt
+    logSecureDownloadAttempt(
+      gameNFT.id,
+      currentAccount.address,
+      true,
+      "Redirecting to secure download from game detail",
+    );
+
+    // Generate secure download URL and redirect
+    const secureUrl = generateSecureDownloadUrl(gameNFT);
+    window.location.href = secureUrl;
   };
 
   return (
@@ -518,10 +497,10 @@ export function GameDetailPage() {
                       ...iglooStyles.button.primary,
                       marginBottom: "12px",
                     }}
-                    disabled={isDownloading}
-                    onClick={handleDownloadGame}
+                    disabled={false}
+                    onClick={handleSecureDownload}
                   >
-                    {isDownloading ? "⏳ Downloading..." : "⬇️ Download Game"}
+                    🔐 Secure Download
                   </Button>
                   {downloadProgress && (
                     <Box mb="2" style={{ textAlign: "center" }}>
