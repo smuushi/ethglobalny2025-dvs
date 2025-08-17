@@ -346,7 +346,7 @@ export function HomePage() {
         </Box>
 
         <Grid columns={{ initial: "1", sm: "2", lg: "4" }} gap="6">
-          {features.map((feature, index) => (
+          {features.map((feature) => (
             <Card
               key={feature.id}
               style={{
