@@ -22,6 +22,7 @@ import {
 } from "@radix-ui/themes";
 import { useNetworkVariable } from "./networkConfig";
 import ClipLoader from "react-spinners/ClipLoader";
+import { iglooTheme, iglooStyles } from "./theme";
 
 interface GameMetadata {
   title: string;
@@ -578,9 +579,35 @@ export function GameUpload() {
     metadata.price;
 
   return (
-    <Card size="3" style={{ maxWidth: "600px", margin: "0 auto" }}>
+    <Card 
+      size="3" 
+      style={{ 
+        ...iglooStyles.card,
+        maxWidth: "600px", 
+        margin: "0 auto",
+        background: iglooTheme.gradients.frostWhite
+      }}
+    >
       <Flex direction="column" gap="4">
-        <Heading size="6">Publish Your Game</Heading>
+        <Flex align="center" gap="3">
+          <Box
+            style={{
+              fontSize: '2rem',
+              filter: 'drop-shadow(0 2px 4px rgba(14, 165, 233, 0.3))'
+            }}
+          >
+            📤
+          </Box>
+          <Heading 
+            size="6"
+            style={{ 
+              color: iglooTheme.colors.primary[700],
+              textShadow: '0 1px 2px rgba(14, 165, 233, 0.1)'
+            }}
+          >
+            Publish Your Game
+          </Heading>
+        </Flex>
 
         <Flex direction="column" gap="3">
           <Box>
@@ -761,6 +788,11 @@ export function GameUpload() {
           disabled={
             !isFormValid || uploadProgress.isUploading || isTransactionPending
           }
+          style={{
+            ...iglooStyles.button.primary,
+            width: '100%',
+            marginTop: '16px'
+          }}
         >
           {uploadProgress.isUploading || isTransactionPending ? (
             <Flex align="center" gap="2">
@@ -768,7 +800,7 @@ export function GameUpload() {
               Publishing...
             </Flex>
           ) : (
-            "Publish Game"
+            "❄️ Publish Game"
           )}
         </Button>
 

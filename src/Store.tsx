@@ -13,6 +13,7 @@ import {
   Skeleton,
 } from "@radix-ui/themes";
 import { useNetworkVariable } from "./networkConfig";
+import { iglooTheme, iglooStyles } from "./theme";
 
 interface GameFileMetadata {
   original_filename: string;
@@ -455,12 +456,26 @@ export function Store() {
   if (loading || isLoadingStore || isLoadingEvents || isLoadingAll) {
     return (
       <Box>
-        <Heading size="6" mb="4">
-          Game Store
+        <Heading
+          size="6"
+          mb="4"
+          style={{
+            color: iglooTheme.colors.primary[700],
+            textShadow: "0 1px 2px rgba(14, 165, 233, 0.1)",
+          }}
+        >
+          🏪 Game Store
         </Heading>
         <Grid columns="3" gap="4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} size="2">
+            <Card
+              key={i}
+              size="2"
+              style={{
+                ...iglooStyles.card,
+                height: "300px",
+              }}
+            >
               <Skeleton height="150px" />
               <Box mt="3">
                 <Skeleton height="20px" mb="2" />
@@ -477,15 +492,37 @@ export function Store() {
   if (queryError || eventsError) {
     return (
       <Box>
-        <Heading size="6" mb="4">
-          Game Store
+        <Heading
+          size="6"
+          mb="4"
+          style={{
+            color: iglooTheme.colors.primary[700],
+            textShadow: "0 1px 2px rgba(14, 165, 233, 0.1)",
+          }}
+        >
+          🏪 Game Store
         </Heading>
-        <Text color="red">
-          Error loading games:{" "}
-          {(queryError as any)?.message ||
-            (eventsError as any)?.message ||
-            "Unknown error"}
-        </Text>
+        <Card
+          style={{
+            ...iglooStyles.card,
+            padding: "24px",
+            background: `linear-gradient(135deg, ${iglooTheme.colors.primary[50]} 0%, ${iglooTheme.colors.ice[50]} 100%)`,
+            border: `1px solid ${iglooTheme.colors.primary[200]}`,
+          }}
+        >
+          <Text
+            style={{
+              color: iglooTheme.colors.primary[700],
+              fontSize: "16px",
+              fontWeight: "500",
+            }}
+          >
+            ❄️ Error loading games:{" "}
+            {(queryError as any)?.message ||
+              (eventsError as any)?.message ||
+              "Unknown error"}
+          </Text>
+        </Card>
       </Box>
     );
   }
@@ -493,18 +530,59 @@ export function Store() {
   if (!games.length) {
     return (
       <Box>
-        <Heading size="6" mb="4">
-          Game Store
+        <Heading
+          size="6"
+          mb="4"
+          style={{
+            color: iglooTheme.colors.primary[700],
+            textShadow: "0 1px 2px rgba(14, 165, 233, 0.1)",
+          }}
+        >
+          🏪 Game Store
         </Heading>
-        <Card size="3" style={{ textAlign: "center", padding: "40px" }}>
-          <Heading size="4" mb="2">
+        <Card
+          size="3"
+          style={{
+            ...iglooStyles.card,
+            textAlign: "center",
+            padding: "48px",
+            background: iglooTheme.gradients.frostWhite,
+          }}
+        >
+          <Box
+            style={{
+              fontSize: "3rem",
+              marginBottom: "16px",
+              filter: "drop-shadow(0 4px 8px rgba(14, 165, 233, 0.2))",
+            }}
+          >
+            🎮
+          </Box>
+          <Heading
+            size="4"
+            mb="2"
+            style={{
+              color: iglooTheme.colors.primary[700],
+            }}
+          >
             No Games Published Yet
           </Heading>
-          <Text color="gray" mb="4">
+          <Text
+            mb="4"
+            style={{
+              color: iglooTheme.colors.ice[600],
+              fontSize: "16px",
+            }}
+          >
             Be the first to publish a game on ColdCache!
           </Text>
-          <Text size="2" color="gray">
-            Switch to the "Publish Game" tab to upload your first game.
+          <Text
+            size="2"
+            style={{
+              color: iglooTheme.colors.ice[500],
+            }}
+          >
+            Visit the "Publish" page to upload your first game.
           </Text>
         </Card>
       </Box>
@@ -514,7 +592,15 @@ export function Store() {
   return (
     <Box>
       <Flex justify="between" align="center" mb="4">
-        <Heading size="6">Game Store</Heading>
+        <Heading
+          size="6"
+          style={{
+            color: iglooTheme.colors.primary[700],
+            textShadow: "0 1px 2px rgba(14, 165, 233, 0.1)",
+          }}
+        >
+          🏪 Game Store
+        </Heading>
         <Flex gap="2" align="center">
           <Button
             variant="soft"
@@ -524,10 +610,25 @@ export function Store() {
               refetchEvents();
               refetchAll();
             }}
+            style={{
+              background: iglooTheme.colors.primary[100],
+              color: iglooTheme.colors.primary[700],
+              border: `1px solid ${iglooTheme.colors.primary[200]}`,
+              borderRadius: iglooTheme.borderRadius.arch,
+            }}
           >
             🔄 Refresh
           </Button>
-          <Badge variant="soft" size="2">
+          <Badge
+            variant="soft"
+            size="2"
+            style={{
+              background: iglooTheme.gradients.iceBlue,
+              color: iglooTheme.colors.primary[700],
+              border: `1px solid ${iglooTheme.colors.primary[200]}`,
+              borderRadius: iglooTheme.borderRadius.arch,
+            }}
+          >
             {games.length} {games.length === 1 ? "Game" : "Games"} Available
           </Badge>
         </Flex>
@@ -535,7 +636,14 @@ export function Store() {
 
       <Grid columns={{ initial: "1", sm: "2", md: "3" }} gap="4">
         {games.map((game) => (
-          <Card key={game.id} size="2" style={{ height: "100%" }}>
+          <Card
+            key={game.id}
+            size="2"
+            style={{
+              ...iglooStyles.card,
+              height: "100%",
+            }}
+          >
             {/* Cover Image Area with CDN Display */}
             <Box
               style={{

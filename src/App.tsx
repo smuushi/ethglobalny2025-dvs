@@ -1,82 +1,118 @@
-import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
-import { isValidSuiObjectId } from "@mysten/sui/utils";
-import { Box, Container, Flex, Heading, Tabs } from "@radix-ui/themes";
-import { useState } from "react";
-import { Counter } from "./Counter";
-import { CreateCounter } from "./CreateCounter";
-import { GameUpload } from "./GameUpload";
-import { Store } from "./Store";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Box, Flex, Heading } from "@radix-ui/themes";
+import { Layout } from "./components/Layout";
+import { HomePage } from "./pages/HomePage";
+import { StorePage } from "./pages/StorePage";
+import { LibraryPage } from "./pages/LibraryPage";
+import { PublishPage } from "./pages/PublishPage";
+import { iglooTheme, iglooStyles } from "./theme";
 
 function App() {
   const currentAccount = useCurrentAccount();
-  const [counterId, setCounter] = useState(() => {
-    const hash = window.location.hash.slice(1);
-    return isValidSuiObjectId(hash) ? hash : null;
-  });
+
+  if (!currentAccount) {
+    return (
+      <Box style={iglooStyles.container}>
+        <Flex
+          justify="center"
+          align="center"
+          style={{
+            minHeight: "100vh",
+            background: iglooTheme.gradients.iglooMain,
+          }}
+        >
+          <Box
+            style={{
+              ...iglooStyles.card,
+              padding: "48px",
+              textAlign: "center",
+              maxWidth: "500px",
+              background: iglooTheme.gradients.frostWhite,
+            }}
+          >
+            <Box
+              style={{
+                marginBottom: "24px",
+                filter: "drop-shadow(0 4px 8px rgba(14, 165, 233, 0.3))",
+                textAlign: "center",
+              }}
+            >
+              <img
+                src="/cc_logo.PNG"
+                alt="ColdCache Logo"
+                style={{
+                  height: "80px",
+                  width: "auto",
+                  display: "inline-block",
+                }}
+              />
+            </Box>
+            <Heading
+              size="8"
+              mb="4"
+              style={{
+                color: iglooTheme.colors.primary[700],
+                textShadow: "0 2px 4px rgba(14, 165, 233, 0.1)",
+              }}
+            >
+              Welcome to ColdCache
+            </Heading>
+            <Heading
+              size="4"
+              mb="6"
+              style={{
+                color: iglooTheme.colors.ice[600],
+                fontWeight: "400",
+                lineHeight: "1.6",
+              }}
+            >
+              The coolest decentralized game store on the blockchain
+            </Heading>
+            <Box
+              style={{
+                background: iglooTheme.gradients.iceBlue,
+                padding: "24px",
+                borderRadius: iglooTheme.borderRadius.arch,
+                border: `1px solid ${iglooTheme.colors.primary[200]}`,
+              }}
+            >
+              <Heading
+                size="5"
+                style={{
+                  color: iglooTheme.colors.primary[700],
+                  marginBottom: "8px",
+                }}
+              >
+                ❄️ Please connect your wallet to get started
+              </Heading>
+              <Box
+                style={{
+                  color: iglooTheme.colors.ice[600],
+                  fontSize: "14px",
+                }}
+              >
+                Connect your Sui wallet to explore games, manage your library,
+                and publish your own creations
+              </Box>
+            </Box>
+          </Box>
+        </Flex>
+      </Box>
+    );
+  }
 
   return (
-    <>
-      <Flex
-        position="sticky"
-        px="4"
-        py="2"
-        justify="between"
-        style={{
-          borderBottom: "1px solid var(--gray-a2)",
-        }}
-      >
-        <Box>
-          <Heading>ColdCache - Decentralized Game Store</Heading>
-        </Box>
-
-        <Box>
-          <ConnectButton />
-        </Box>
-      </Flex>
-      <Container>
-        <Container
-          mt="5"
-          pt="2"
-          px="4"
-          style={{ background: "var(--gray-a2)", minHeight: 500 }}
-        >
-          {currentAccount ? (
-            <Tabs.Root defaultValue="store">
-              <Tabs.List>
-                <Tabs.Trigger value="store">Browse Games</Tabs.Trigger>
-                <Tabs.Trigger value="upload">Publish Game</Tabs.Trigger>
-                <Tabs.Trigger value="demo">Demo Counter</Tabs.Trigger>
-              </Tabs.List>
-
-              <Box mt="4">
-                <Tabs.Content value="store">
-                  <Store />
-                </Tabs.Content>
-
-                <Tabs.Content value="upload">
-                  <GameUpload />
-                </Tabs.Content>
-
-                <Tabs.Content value="demo">
-                  {counterId ? (
-                    <Counter id={counterId} />
-                  ) : (
-                    <CreateCounter
-                      onCreated={(id) => {
-                        window.location.hash = id;
-                        setCounter(id);
-                      }}
-                    />
-                  )}
-                </Tabs.Content>
-              </Box>
-            </Tabs.Root>
-          ) : (
-            <Heading>Please connect your wallet to get started</Heading>
-          )}
-        </Container>
-      </Container>
-    </>
+    <Router>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/store" element={<StorePage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/publish" element={<PublishPage />} />
+        </Routes>
+      </Layout>
+    </Router>
   );
 }
 
