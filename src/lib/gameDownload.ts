@@ -23,6 +23,7 @@ interface GameEncryptionInfo {
   enhancedMetadata: any;
   secondaryBlobId: string;
   sealEncryptionId: string;
+  isUnencrypted: boolean;
 }
 
 export class GameDownloadManager {
@@ -60,19 +61,43 @@ export class GameDownloadManager {
         const enhancedMetadataStr = fields.enhanced_metadata || "{}";
         const sealEncryptionId = fields.seal_encryption_id || "";
 
+        // DEBUG: Log the full game object structure
+        console.log("🔍 DEBUG: Full game object fields:", {
+          secondary_blob_id: fields.secondary_blob_id,
+          enhanced_metadata: fields.enhanced_metadata,
+          seal_encryption_id: fields.seal_encryption_id,
+          walrus_blob_id: fields.walrus_blob_id,
+          publish_date: fields.publish_date,
+        });
+
         // Parse enhanced metadata JSON
         let enhancedMetadata = {};
         try {
           enhancedMetadata = JSON.parse(enhancedMetadataStr);
+          console.log("🔍 DEBUG: Parsed enhanced metadata:", enhancedMetadata);
         } catch (error) {
           console.warn("Failed to parse enhanced metadata:", error);
         }
 
+        const isPartiallyEncrypted = secondaryBlobId.length > 0;
+        const isUnencrypted =
+          sealEncryptionId.length === 0 || sealEncryptionId === "";
+
+        console.log(`🔍 DEBUG: Encryption detection result:`, {
+          secondaryBlobId,
+          sealEncryptionId,
+          isPartiallyEncrypted,
+          isUnencrypted,
+          secondaryBlobIdLength: secondaryBlobId.length,
+          sealEncryptionIdLength: sealEncryptionId.length,
+        });
+
         return {
-          isPartiallyEncrypted: secondaryBlobId.length > 0,
+          isPartiallyEncrypted,
           enhancedMetadata,
           secondaryBlobId,
           sealEncryptionId,
+          isUnencrypted,
         };
       }
     } catch (error) {
@@ -85,6 +110,7 @@ export class GameDownloadManager {
       enhancedMetadata: {},
       secondaryBlobId: "",
       sealEncryptionId: "",
+      isUnencrypted: true, // Assume unencrypted if we can't determine
     };
   }
 
@@ -123,8 +149,12 @@ export class GameDownloadManager {
           encryptionInfo,
           onProgress,
         );
+      } else if (encryptionInfo.isUnencrypted) {
+        console.log("🔓 Game is UNENCRYPTED - direct download (file <30MB)");
+        return await this.downloadUnencryptedGame(game, onProgress);
       } else {
         console.log("🔒 Game uses FULL encryption - downloading single blob");
+        console.log("📋 Legacy encrypted game - attempting Seal decryption");
         return await this.downloadFullyEncryptedGame(game, onProgress);
       }
     } catch (error) {
@@ -229,6 +259,33 @@ export class GameDownloadManager {
     });
 
     return decryptedGame;
+  }
+
+  /**
+   * Download unencrypted game directly (no Seal decryption needed)
+   */
+  private async downloadUnencryptedGame(
+    game: GameNFT,
+    onProgress?: (progress: DownloadProgress) => void,
+  ): Promise<Blob> {
+    // Stage 1: Download game file directly from Walrus
+    onProgress?.({
+      stage: "downloading",
+      progress: 50,
+      message: "Downloading unencrypted game from Walrus...",
+    });
+
+    const gameData = await this.downloadFromWalrus(game.walrusBlobId);
+
+    // Stage 2: Complete (no decryption needed)
+    onProgress?.({
+      stage: "complete",
+      progress: 100,
+      message: "Direct download complete!",
+    });
+
+    // Return as blob with appropriate MIME type
+    return new Blob([gameData], { type: "application/octet-stream" });
   }
 
   /**
@@ -410,6 +467,21 @@ export class GameDownloadManager {
     } catch (error) {
       if (error instanceof Error && error.message.includes("NoAccessError")) {
         throw new Error("You don't own the required NFT to access this game.");
+      }
+
+      // Check for Seal format incompatibility errors
+      if (
+        error instanceof Error &&
+        error.message.includes("Unknown value") &&
+        error.message.includes("for enum")
+      ) {
+        console.error("❌ Seal format compatibility issue:", error);
+        console.error(
+          "💡 This indicates a Seal library version mismatch during encryption/decryption",
+        );
+        throw new Error(
+          "🔧 Seal format compatibility issue detected. This game needs to be re-uploaded with the current encryption system to ensure compatibility.",
+        );
       }
 
       console.error("❌ Decryption failed:", error);
