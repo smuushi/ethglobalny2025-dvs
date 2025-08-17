@@ -87,10 +87,6 @@ export class GameDownloadManager {
    */
   private async verifyOwnership(game: GameNFT): Promise<boolean> {
     try {
-      console.log("🔐 Using Seal-based ownership verification");
-      console.log("🎮 Game ID:", game.gameId);
-      console.log("👤 User:", this.userAddress);
-
       // Get the package ID dynamically
       const { TESTNET_GAME_STORE_PACKAGE_ID } = await import("../constants");
 
@@ -112,22 +108,19 @@ export class GameDownloadManager {
         );
       }
 
-      // Let Seal verify ownership - much simpler!
+      // Verify ownership using Seal
       const { hasAccess, nftId } = await this.sealVerifier.verifyOwnership(
         game.gameId || game.id,
         this.userAddress,
         sessionKey,
       );
 
-      console.log("🎯 Seal verification result:", hasAccess);
       if (hasAccess && nftId) {
-        // Store the actual NFT ID for later use in decryption
         this.verifiedNFTId = nftId;
-        console.log("🎫 Verified NFT ID stored:", this.verifiedNFTId);
       }
       return hasAccess;
     } catch (error) {
-      console.error("❌ Seal ownership verification failed:", error);
+      console.error("❌ Ownership verification failed:", error);
       return false;
     }
   }
@@ -142,8 +135,6 @@ export class GameDownloadManager {
     const AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
     const downloadUrl = `${AGGREGATOR_URL}/v1/blobs/by-quilt-patch-id/${blobId}`;
 
-    console.log("📡 Downloading from Walrus:", downloadUrl);
-
     const response = await fetch(downloadUrl);
 
     if (!response.ok) {
@@ -153,8 +144,6 @@ export class GameDownloadManager {
     }
 
     const arrayBuffer = await response.arrayBuffer();
-    console.log("📦 Downloaded game size:", arrayBuffer.byteLength, "bytes");
-
     return arrayBuffer;
   }
 
@@ -163,32 +152,21 @@ export class GameDownloadManager {
     game: GameNFT,
   ): Promise<Blob> {
     try {
-      console.log("🔐 Attempting Seal decryption for game:", game.title);
-
-      // Import necessary dependencies dynamically
       const { ColdCacheSeal } = await import("./seal");
       const { TESTNET_GAME_STORE_PACKAGE_ID } = await import("../constants");
 
-      // Initialize Seal service
       const seal = new ColdCacheSeal(this.suiClient);
 
-      // Use existing session key or create a new one
       let sessionKey = this.sessionKey;
       if (!sessionKey) {
-        console.log("⚠️ No session key provided, creating new one");
         sessionKey = await seal.createSessionKey(
           this.userAddress,
           TESTNET_GAME_STORE_PACKAGE_ID,
         );
       }
-      console.log("✅ Session key ready for decryption");
 
       // Use the verified NFT ID from ownership verification
       const gameNFTId = this.verifiedNFTId || game.gameId || game.id;
-      console.log("🎫 Using verified NFT ID for Seal decryption:", gameNFTId);
-      console.log("🔍 Debug: verifiedNFTId =", this.verifiedNFTId);
-      console.log("🔍 Debug: game.gameId =", game.gameId);
-      console.log("🔍 Debug: game.id =", game.id);
 
       // Create move call constructor for access verification (synchronous, imports cached)
       const { fromHex } = await import("@mysten/sui/utils");
@@ -197,68 +175,40 @@ export class GameDownloadManager {
         tx: Transaction,
         id: string,
       ) => {
-        console.log("🔗 Building access verification transaction with ID:", id);
-        console.log("🔗 Using NFT object ID:", gameNFTId);
-        console.log(
-          "🔗 Target function:",
-          `${TESTNET_GAME_STORE_PACKAGE_ID}::game_store::seal_approve_game_access`,
-        );
-
         try {
-          // Convert hex ID to bytes for the transaction (like the Seal example)
           const idBytes = fromHex(id);
-          console.log("🔗 ID hex:", id);
-          console.log(
-            "🔗 ID bytes length:",
-            idBytes.length,
-            "first few:",
-            Array.from(idBytes).slice(0, 10),
-          );
-
           tx.moveCall({
             target: `${TESTNET_GAME_STORE_PACKAGE_ID}::game_store::seal_approve_game_access`,
             arguments: [
               tx.pure.vector("u8", Array.from(idBytes)),
-              tx.object(gameNFTId), // User's NFT for this game
+              tx.object(gameNFTId),
             ],
           });
-
-          console.log("🔗 Transaction built successfully");
         } catch (error) {
-          console.error("❌ Failed to build transaction:", error);
+          console.error(
+            "❌ Failed to build Seal verification transaction:",
+            error,
+          );
           throw error;
         }
       };
 
-      // Decrypt using Seal
       const decryptedBytes = await seal.decryptGame(
         new Uint8Array(encryptedData),
         sessionKey,
         moveCallConstructor,
       );
 
-      console.log("✅ Game decrypted successfully with Seal");
       return new Blob([new Uint8Array(decryptedBytes)]);
     } catch (error) {
-      console.error("❌ Seal decryption failed:", error);
-
-      // Handle specific Seal errors (import NoAccessError if needed)
-      if (
-        error instanceof Error &&
-        error.message.includes("You don't own the required NFT")
-      ) {
-        throw new Error(
-          "Access denied: You don't own the required NFT to decrypt this game.",
-        );
+      if (error instanceof Error && error.message.includes("NoAccessError")) {
+        throw new Error("You don't own the required NFT to access this game.");
       }
 
-      // If Seal decryption fails, try returning raw data for backwards compatibility
-      // This handles games that were uploaded before encryption was enabled
-      console.log(
-        "⚠️ Seal decryption failed, trying raw data (game may not be encrypted)",
+      console.error("❌ Decryption failed:", error);
+      throw new Error(
+        "Access denied: You don't own the required NFT to decrypt this game.",
       );
-      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate processing time
-      return new Blob([encryptedData]);
     }
   }
 

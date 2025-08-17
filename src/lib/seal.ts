@@ -149,13 +149,9 @@ export class ColdCacheSeal {
     moveCallConstructor: MoveCallConstructor,
   ): Promise<Uint8Array> {
     try {
-      // Parse the encrypted object to get the ID
       const fullId = EncryptedObject.parse(encryptedData).id;
-      console.log("🔐 Decrypting game with Seal ID:", fullId);
-      console.log("Encrypted data size:", encryptedData.length, "bytes");
 
-      // PHASE 1: Fetch keys first (like the example)
-      console.log("🔑 Phase 1: Fetching decryption keys...");
+      // PHASE 1: Fetch keys
       const tx1 = new Transaction();
       moveCallConstructor(tx1, fullId);
       const txBytes = await tx1.build({
@@ -169,10 +165,8 @@ export class ColdCacheSeal {
         sessionKey,
         threshold: 2,
       });
-      console.log("✅ Keys fetched successfully");
 
-      // PHASE 2: Decrypt locally using pre-fetched keys (like the example)
-      console.log("🔓 Phase 2: Decrypting with pre-fetched keys...");
+      // PHASE 2: Decrypt locally
       const tx2 = new Transaction();
       moveCallConstructor(tx2, fullId);
       const txBytes2 = await tx2.build({
@@ -186,23 +180,14 @@ export class ColdCacheSeal {
         txBytes: txBytes2,
       });
 
-      console.log(
-        "✅ Game decrypted successfully, size:",
-        decryptedBytes.length,
-        "bytes",
-      );
       return decryptedBytes;
     } catch (error) {
-      console.error("❌ Seal decryption failed:", error);
-
-      // Handle common Seal errors (following example pattern)
       if (error instanceof NoAccessError) {
         throw new Error("You don't own the required NFT to access this game.");
       }
 
-      throw new Error(
-        `Failed to decrypt game: ${error instanceof Error ? error.message : "Unable to decrypt files, try again"}`,
-      );
+      console.error("❌ Seal decryption failed:", error);
+      throw new Error("You don't own the required NFT to access this game.");
     }
   }
 
@@ -253,45 +238,19 @@ export class ColdCacheSeal {
     moveCallConstructor: MoveCallConstructor,
   ): Promise<boolean> {
     try {
-      console.log("🔐 Verifying ownership using Move contract dry run");
-      console.log("🎮 Game ID:", gameId);
-      console.log("👤 User:", userAddress);
+      const testEncryptionId = "test_id_for_verification";
 
-      // Instead of using Seal's fetchKeys (which requires real encrypted data),
-      // let's just test if the Move contract call would succeed with a dry run
-      const testEncryptionId = "test_id_for_verification"; // Dummy ID for testing
-
-      console.log("🔗 Building test transaction with ID:", testEncryptionId);
-
-      // Try to build and dry-run the transaction
       const tx = new Transaction();
-      tx.setSender(userAddress); // Set the transaction sender for dry run
+      tx.setSender(userAddress);
       moveCallConstructor(tx, testEncryptionId);
 
-      // Dry run the transaction to see if it would succeed
       const result = await this.suiClient.dryRunTransactionBlock({
         transactionBlock: await tx.build({ client: this.suiClient }),
       });
 
-      console.log("🔗 Dry run result:", result.effects?.status?.status);
-
-      // If dry run succeeds, the user has access
-      const hasAccess = result.effects?.status?.status === "success";
-
-      if (hasAccess) {
-        console.log("✅ Move contract verification successful");
-      } else {
-        console.log("❌ Move contract verification failed");
-        console.log("🔍 Error details:", result.effects?.status?.error);
-      }
-
-      return hasAccess;
+      return result.effects?.status?.status === "success";
     } catch (error) {
       console.warn("⚠️ Ownership verification error:", error);
-      console.warn("⚠️ Error details:", {
-        name: error?.constructor?.name,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
       return false;
     }
   }

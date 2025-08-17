@@ -35,20 +35,11 @@ export class SealOwnershipVerifier {
     sessionKey: SessionKey,
   ): Promise<{ hasAccess: boolean; nftId?: string }> {
     try {
-      console.log("🔐 Seal-only ownership verification");
-      console.log("🎮 Game ID:", gameId);
-      console.log("👤 User:", userAddress);
-
-      // First, we need to find the user's NFT that grants access to this game
-      // This is the key fix - we need the NFT ID, not the game ID
       const userNFTId = await this.findUserNFTForGame(gameId, userAddress);
 
       if (!userNFTId) {
-        console.log("❌ No NFT found for this game");
         return { hasAccess: false };
       }
-
-      console.log("🎫 Found user's NFT:", userNFTId);
 
       // Create the move call constructor with the actual NFT ID
       const moveCallConstructor: MoveCallConstructor = (tx, id) => {
@@ -63,7 +54,6 @@ export class SealOwnershipVerifier {
         });
       };
 
-      // Try to verify using Seal - if this succeeds, user has access
       const hasAccess = await this.seal.verifyOwnership(
         gameId,
         userAddress,
@@ -71,14 +61,12 @@ export class SealOwnershipVerifier {
         moveCallConstructor,
       );
 
-      console.log("🎯 Seal verification result:", hasAccess);
-
       return {
         hasAccess,
         nftId: hasAccess ? userNFTId : undefined,
       };
     } catch (error) {
-      console.error("❌ Seal ownership verification failed:", error);
+      console.error("❌ Ownership verification failed:", error);
       return { hasAccess: false };
     }
   }
@@ -91,9 +79,6 @@ export class SealOwnershipVerifier {
     userAddress: string,
   ): Promise<string | null> {
     try {
-      console.log("🔍 Getting ALL owned objects for user:", userAddress);
-      console.log("🔍 Looking for game ID:", gameId);
-
       let allObjects: any[] = [];
       let cursor: string | null = null;
       let hasNextPage = true;
@@ -103,7 +88,7 @@ export class SealOwnershipVerifier {
         const response: any = await this.suiClient.getOwnedObjects({
           owner: userAddress,
           cursor,
-          limit: 50, // Max per page
+          limit: 50,
           options: {
             showContent: true,
             showType: true,
@@ -116,44 +101,23 @@ export class SealOwnershipVerifier {
 
         cursor = response.nextCursor;
         hasNextPage = response.hasNextPage || false;
-
-        console.log(
-          `📄 Fetched page: ${allObjects.length} total objects so far, hasNextPage: ${hasNextPage}`,
-        );
       }
-
-      console.log(`🎯 Total objects fetched: ${allObjects.length}`);
 
       // Look for any NFT that references this game
       const matchingNFT = allObjects.find((obj: any) => {
         const content = obj.data?.content as any;
         if (!content || content.dataType !== "moveObject") return false;
 
-        // Check if this is a GameNFT
         const isGameNFT = content.type?.includes("::GameNFT");
         if (!isGameNFT) return false;
 
         const fields = content.fields;
         const nftGameId = fields?.game_id;
 
-        console.log(
-          `🔍 Checking NFT: ${obj.data?.objectId}, game_id: ${nftGameId}, target: ${gameId}`,
-        );
-
-        // Check if this NFT references the game we want to download
         return nftGameId === gameId;
       });
 
-      if (matchingNFT) {
-        console.log(
-          "✅ Found matching NFT for game:",
-          matchingNFT.data?.objectId,
-        );
-        return matchingNFT.data?.objectId || null;
-      }
-
-      console.log("❌ No matching NFT found after checking all objects");
-      return null;
+      return matchingNFT?.data?.objectId || null;
     } catch (error) {
       console.error("❌ Failed to find user NFT for game:", error);
       return null;
