@@ -2,6 +2,7 @@ import { ConnectButton } from "@mysten/dapp-kit";
 import { Box, Container, Flex, Heading } from "@radix-ui/themes";
 import { Link, useLocation } from "react-router-dom";
 import { iglooTheme, iglooStyles } from "../theme";
+import { RouteTransition } from "./RouteTransition";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -80,7 +81,8 @@ export function Layout({ children }: LayoutProps) {
                       ? iglooTheme.colors.primary[700]
                       : iglooTheme.colors.ice[600],
                   fontWeight: location.pathname === item.path ? "600" : "500",
-                  transition: "all 0.2s ease",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  transform: "translateY(0)",
                   border:
                     location.pathname === item.path
                       ? `1px solid ${iglooTheme.colors.primary[200]}`
@@ -92,12 +94,14 @@ export function Layout({ children }: LayoutProps) {
                       iglooTheme.colors.ice[50];
                     e.currentTarget.style.color =
                       iglooTheme.colors.primary[600];
+                    e.currentTarget.style.transform = "translateY(-1px)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (location.pathname !== item.path) {
                     e.currentTarget.style.background = "transparent";
                     e.currentTarget.style.color = iglooTheme.colors.ice[600];
+                    e.currentTarget.style.transform = "translateY(0)";
                   }
                 }}
               >
@@ -128,7 +132,7 @@ export function Layout({ children }: LayoutProps) {
             margin: "20px auto",
           }}
         >
-          {children}
+          <RouteTransition>{children}</RouteTransition>
         </Container>
       </Container>
     </Box>
