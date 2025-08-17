@@ -25,11 +25,18 @@ import {
   formatPriceToSui,
   formatTimestamp,
 } from "../schemas/nft";
+import { GameCardMenu } from "../components/GameCardMenu";
 
 export function LibraryPage() {
   const currentAccount = useCurrentAccount();
   const nftPackageId = useNetworkVariable("nftPackageId");
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
+
+  // Refresh function for after transfers
+  const handleRefresh = () => {
+    // Force re-query by invalidating the cache (if available)
+    window.location.reload(); // Simple approach for now
+  };
 
   // Query for owned NFTs from the standalone NFT contract
   const {
@@ -215,42 +222,45 @@ export function LibraryPage() {
               className="game-card"
             >
               <Box p="4">
-                <Flex align="center" mb="3">
-                  <Avatar
-                    size="3"
-                    src={
-                      getWalrusImageUrl(game.coverImageBlobId || "") ||
-                      undefined
-                    }
-                    fallback={
-                      "isPublished" in game && game.isPublished ? "🎨" : "🎮"
-                    }
-                    style={{
-                      background: iglooTheme.gradients.iceBlue,
-                      color: iglooTheme.colors.primary[700],
-                    }}
-                  />
-                  <Box ml="3">
-                    <Heading
-                      size="4"
+                <Flex align="center" justify="between" mb="3">
+                  <Flex align="center">
+                    <Avatar
+                      size="3"
+                      src={
+                        getWalrusImageUrl(game.coverImageBlobId || "") ||
+                        undefined
+                      }
+                      fallback={
+                        "isPublished" in game && game.isPublished ? "🎨" : "🎮"
+                      }
                       style={{
+                        background: iglooTheme.gradients.iceBlue,
                         color: iglooTheme.colors.primary[700],
-                        lineHeight: "1.2",
                       }}
-                    >
-                      {game.title}
-                    </Heading>
-                    <Flex gap="2">
-                      <Badge size="1" color="cyan">
-                        {game.genre}
-                      </Badge>
-                      {"isPublished" in game && (game as any).isPublished && (
-                        <Badge size="1" color="orange">
-                          Creator
+                    />
+                    <Box ml="3">
+                      <Heading
+                        size="4"
+                        style={{
+                          color: iglooTheme.colors.primary[700],
+                          lineHeight: "1.2",
+                        }}
+                      >
+                        {game.title}
+                      </Heading>
+                      <Flex gap="2">
+                        <Badge size="1" color="cyan">
+                          {game.genre}
                         </Badge>
-                      )}
-                    </Flex>
-                  </Box>
+                        {"isPublished" in game && (game as any).isPublished && (
+                          <Badge size="1" color="orange">
+                            Creator
+                          </Badge>
+                        )}
+                      </Flex>
+                    </Box>
+                  </Flex>
+                  <GameCardMenu game={game} onRefresh={handleRefresh} />
                 </Flex>
 
                 <Text
