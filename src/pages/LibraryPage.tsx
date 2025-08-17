@@ -94,17 +94,28 @@ export function LibraryPage() {
     };
   };
 
-  const gameNFTs =
+  // NFTs from standalone NFT contract (legacy)
+  const legacyGameNFTs =
     nftObjects?.data
       ?.map(parseGameNFTFromSui)
       .filter((nft): nft is GameNFT => nft !== null) || [];
 
-  const publishedGames =
+  // NFTs from game store contract - separate into purchased vs published
+  const gameStoreNFTs_parsed =
     gameStoreNFTs?.data
       ?.map(parseGameStoreNFT)
       .filter(
         (nft): nft is GameNFT & { isPublished: boolean } => nft !== null,
       ) || [];
+
+  // Combine purchased NFTs from both sources
+  const gameNFTs = [
+    ...legacyGameNFTs,
+    ...gameStoreNFTs_parsed.filter((nft) => !nft.isPublished), // Purchased games
+  ];
+
+  // Only publisher NFTs go in published tab
+  const publishedGames = gameStoreNFTs_parsed.filter((nft) => nft.isPublished);
 
   const handleSecureDownload = (game: GameNFT) => {
     if (!currentAccount?.address) {
