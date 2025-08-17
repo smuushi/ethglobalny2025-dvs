@@ -449,7 +449,7 @@ export function PublisherDashboard() {
                         size="1"
                         style={{
                           color: iglooTheme.colors.ice[600],
-                          marginTop: "4px",
+                          marginTop: "8px",
                           display: "block",
                         }}
                       >
@@ -653,7 +653,13 @@ export function PublisherDashboard() {
               >
                 📊 Per-Game Revenue
               </Heading>
-              <Box style={{ maxHeight: "400px", overflowY: "auto" }}>
+              <Box
+                style={{
+                  maxHeight: "400px",
+                  overflowY: "auto",
+                  padding: "2px",
+                }}
+              >
                 {publishedGames.map((game) => (
                   <Card
                     key={game.id}
@@ -664,8 +670,8 @@ export function PublisherDashboard() {
                       background: iglooTheme.gradients.iceBlue,
                     }}
                   >
-                    <Flex justify="between" align="center">
-                      <Box>
+                    <Flex justify="between" align="start">
+                      <Box style={{ display: "flex", flexDirection: "column" }}>
                         <Text
                           size="3"
                           weight="bold"
@@ -675,12 +681,23 @@ export function PublisherDashboard() {
                         </Text>
                         <Text
                           size="2"
-                          style={{ color: iglooTheme.colors.ice[600] }}
+                          style={{
+                            color: iglooTheme.colors.ice[600],
+                            marginTop: "8px",
+                          }}
                         >
                           {gameStats[game.gameId]?.totalSales || 0} sales
                         </Text>
                       </Box>
-                      <Box style={{ textAlign: "right" }}>
+                      <Box
+                        style={{
+                          textAlign: "right",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                          gap: "8px",
+                        }}
+                      >
                         <Text
                           size="3"
                           weight="bold"
@@ -696,7 +713,6 @@ export function PublisherDashboard() {
                           size="1"
                           style={{
                             ...iglooStyles.button.primary,
-                            marginTop: "4px",
                           }}
                           onClick={() => {
                             setSelectedGame(game as any);
