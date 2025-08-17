@@ -26,6 +26,9 @@ import { useNetworkVariable } from "./networkConfig";
 import ClipLoader from "react-spinners/ClipLoader";
 import { iglooTheme, iglooStyles } from "./theme";
 
+// Maximum file size allowed by Walrus (13.3 GiB)
+const MAX_FILE_SIZE = 13.3 * 1024 * 1024 * 1024; // 13.3 GiB in bytes
+
 interface GameMetadata {
   title: string;
   description: string;
@@ -173,6 +176,25 @@ export function GameUpload() {
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (file) {
+        // Check file size constraint for game files
+        if (field === "gameFile" && file.size > MAX_FILE_SIZE) {
+          setUploadProgress((prev) => ({
+            ...prev,
+            error: `File too large. Maximum size allowed is 13.3 GiB. Your file is ${(file.size / 1024 / 1024 / 1024).toFixed(2)} GiB.`,
+          }));
+          // Clear the file input
+          event.target.value = "";
+          return;
+        }
+
+        // Clear any previous file size errors
+        setUploadProgress((prev) => ({
+          ...prev,
+          error: prev.error?.includes("File too large")
+            ? undefined
+            : prev.error,
+        }));
+
         setMetadata((prev) => ({ ...prev, [field]: file }));
       }
     };
@@ -770,7 +792,7 @@ export function GameUpload() {
               required
             />
             <Text size="1" color="gray">
-              Supported: ZIP, RAR, 7Z, TAR, EXE, DMG files
+              Supported: ZIP, RAR, 7Z, TAR, EXE, DMG files (Max size: 13.3 GiB)
             </Text>
             {metadata.gameFile && (
               <Text size="1" color="gray">
