@@ -1,5 +1,5 @@
-import { GameUpload } from "../GameUpload";
+import { PublisherDashboard } from "./PublisherDashboard";
 
 export function PublishPage() {
-  return <GameUpload />;
+  return <PublisherDashboard />;
 }

@@ -16,6 +16,8 @@ module game_store::game_store {
     const ENotOwner: u64 = 2;
     const EGameNotActive: u64 = 3;
     const ENoAccess: u64 = 4;
+    const EMaxSupplyReached: u64 = 5;
+    const EInsufficientBalance: u64 = 6;
 
     /// One-Time-Witness for the module
     public struct GAME_STORE has drop {}
@@ -42,6 +44,10 @@ module game_store::game_store {
         // Enhanced metadata fields
         game_file_metadata: GameFileMetadata,
         cover_image_metadata: GameFileMetadata,
+        // Publisher management fields
+        revenue_balance: Coin<SUI>,
+        max_supply: u64, // 0 means unlimited
+        withdrawn_amount: u64,
     }
 
     public struct GameNFT has key, store {
@@ -232,6 +238,9 @@ module game_store::game_store {
             total_sales: 0,
             game_file_metadata: game_metadata,
             cover_image_metadata: cover_metadata,
+            revenue_balance: coin::zero<SUI>(ctx),
+            max_supply: 0, // 0 means unlimited
+            withdrawn_amount: 0,
         };
         
         let game_id = object::id(&game);
@@ -283,7 +292,13 @@ module game_store::game_store {
         assert!(game.is_active, EGameNotActive);
         assert!(coin::value(&payment) >= game.price, EInsufficientPayment);
         
-        transfer::public_transfer(payment, game.publisher);
+        // Check max supply if set
+        if (game.max_supply > 0) {
+            assert!(game.total_sales < game.max_supply, EMaxSupplyReached);
+        };
+        
+        // Add payment to game's revenue balance instead of direct transfer
+        coin::join(&mut game.revenue_balance, payment);
         
         game.total_sales = game.total_sales + 1;
         
@@ -338,15 +353,6 @@ module game_store::game_store {
     public fun deactivate_game(game: &mut Game, ctx: &TxContext) {
         assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
         game.is_active = false;
-    }
-
-    public fun update_game_price(
-        game: &mut Game,
-        new_price: u64,
-        ctx: &TxContext
-    ) {
-        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
-        game.price = new_price;
     }
 
     public fun get_game_info(game: &Game): (String, String, u64, address, String, String, bool, u64) {
@@ -428,6 +434,96 @@ module game_store::game_store {
         // Additional verification: check publisher or purchase rights  
         let has_access = (nft.publisher == caller) || (nft.is_publisher_nft == false);
         assert!(has_access, ENoAccess);
+    }
+
+    // ==================== Publisher Management Functions ====================
+    
+    /// Withdraw revenue from a game (publisher only)
+    public entry fun withdraw_revenue(
+        game: &mut Game,
+        amount: u64,
+        ctx: &mut TxContext
+    ) {
+        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
+        assert!(coin::value(&game.revenue_balance) >= amount, EInsufficientBalance);
+        
+        let withdrawal = coin::split(&mut game.revenue_balance, amount, ctx);
+        transfer::public_transfer(withdrawal, tx_context::sender(ctx));
+        
+        game.withdrawn_amount = game.withdrawn_amount + amount;
+    }
+    
+    /// Set maximum supply for a game (publisher only)
+    public entry fun set_max_supply(
+        game: &mut Game,
+        max_supply: u64,
+        ctx: &TxContext
+    ) {
+        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
+        assert!(max_supply == 0 || max_supply >= game.total_sales, EMaxSupplyReached);
+        game.max_supply = max_supply;
+    }
+    
+    /// Update game price (publisher only)
+    public entry fun update_game_price(
+        game: &mut Game,
+        new_price: u64,
+        ctx: &TxContext
+    ) {
+        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
+        game.price = new_price;
+    }
+    
+    /// Deactivate/reactivate game (publisher only)
+    public entry fun toggle_game_active(
+        game: &mut Game,
+        ctx: &TxContext
+    ) {
+        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
+        game.is_active = !game.is_active;
+    }
+    
+    // ==================== View Functions ====================
+    
+    /// Get game revenue info (public view)
+    public fun get_game_revenue_info(game: &Game): (u64, u64, u64) {
+        (coin::value(&game.revenue_balance), game.withdrawn_amount, game.max_supply)
+    }
+    
+    /// Get total available revenue for withdrawal (public view)
+    public fun get_available_revenue(game: &Game): u64 {
+        coin::value(&game.revenue_balance)
+    }
+    
+    /// Check if caller is the publisher (public view)
+    public fun is_publisher(game: &Game, caller: address): bool {
+        game.publisher == caller
+    }
+    
+    /// Get game details for publisher dashboard (public view)
+    public fun get_game_stats(game: &Game): (u64, u64, u64, u64, bool) {
+        (
+            game.price,
+            game.total_sales,
+            coin::value(&game.revenue_balance),
+            game.max_supply,
+            game.is_active
+        )
+    }
+    
+    /// Withdraw all available revenue (publisher only)
+    public entry fun withdraw_all_revenue(
+        game: &mut Game,
+        ctx: &mut TxContext
+    ) {
+        assert!(game.publisher == tx_context::sender(ctx), ENotOwner);
+        let available = coin::value(&game.revenue_balance);
+        assert!(available > 0, EInsufficientBalance);
+        
+        let withdrawal = coin::split(&mut game.revenue_balance, available, ctx);
+        transfer::public_transfer(withdrawal, tx_context::sender(ctx));
+        
+        game.withdrawn_amount = game.withdrawn_amount + available;
     }
 
     /// Alternative seal approve for publisher access
