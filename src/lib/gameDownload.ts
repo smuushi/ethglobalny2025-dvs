@@ -7,9 +7,22 @@ import { SealOwnershipVerifier } from "./sealOwnership";
 export type MoveCallConstructor = (tx: Transaction, id: string) => void;
 
 interface DownloadProgress {
-  stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
+  stage:
+    | "verifying"
+    | "downloading"
+    | "decrypting"
+    | "reconstructing"
+    | "complete"
+    | "error";
   progress: number;
   message: string;
+}
+
+interface GameEncryptionInfo {
+  isPartiallyEncrypted: boolean;
+  enhancedMetadata: any;
+  secondaryBlobId: string;
+  sealEncryptionId: string;
 }
 
 export class GameDownloadManager {
@@ -28,6 +41,53 @@ export class GameDownloadManager {
     this.sealVerifier = new SealOwnershipVerifier(suiClient, "testnet", "");
   }
 
+  /**
+   * Fetch game encryption information from the blockchain
+   */
+  private async getGameEncryptionInfo(
+    gameId: string,
+  ): Promise<GameEncryptionInfo> {
+    try {
+      const gameObject = await this.suiClient.getObject({
+        id: gameId,
+        options: { showContent: true },
+      });
+
+      if (gameObject.data?.content && "fields" in gameObject.data.content) {
+        const fields = gameObject.data.content.fields as any;
+
+        const secondaryBlobId = fields.secondary_blob_id || "";
+        const enhancedMetadataStr = fields.enhanced_metadata || "{}";
+        const sealEncryptionId = fields.seal_encryption_id || "";
+
+        // Parse enhanced metadata JSON
+        let enhancedMetadata = {};
+        try {
+          enhancedMetadata = JSON.parse(enhancedMetadataStr);
+        } catch (error) {
+          console.warn("Failed to parse enhanced metadata:", error);
+        }
+
+        return {
+          isPartiallyEncrypted: secondaryBlobId.length > 0,
+          enhancedMetadata,
+          secondaryBlobId,
+          sealEncryptionId,
+        };
+      }
+    } catch (error) {
+      console.error("Failed to fetch game encryption info:", error);
+    }
+
+    // Fallback for games without partial encryption
+    return {
+      isPartiallyEncrypted: false,
+      enhancedMetadata: {},
+      secondaryBlobId: "",
+      sealEncryptionId: "",
+    };
+  }
+
   async downloadGame(
     game: GameNFT,
     onProgress?: (progress: DownloadProgress) => void,
@@ -36,7 +96,7 @@ export class GameDownloadManager {
       // Stage 1: Verify ownership
       onProgress?.({
         stage: "verifying",
-        progress: 10,
+        progress: 5,
         message: "Verifying NFT ownership...",
       });
 
@@ -45,32 +105,28 @@ export class GameDownloadManager {
         throw new Error("Ownership verification failed");
       }
 
-      // Stage 2: Download encrypted game from Walrus
+      // Stage 2: Get encryption information
       onProgress?.({
-        stage: "downloading",
-        progress: 30,
-        message: "Downloading encrypted game from Walrus...",
+        stage: "verifying",
+        progress: 15,
+        message: "Checking game encryption type...",
       });
 
-      const encryptedGame = await this.downloadFromWalrus(game.walrusBlobId);
+      const encryptionInfo = await this.getGameEncryptionInfo(
+        game.gameId || game.id,
+      );
 
-      // Stage 3: Decrypt with Seal
-      onProgress?.({
-        stage: "decrypting",
-        progress: 70,
-        message: "Decrypting game with Seal...",
-      });
-
-      const decryptedGame = await this.decryptWithSeal(encryptedGame, game);
-
-      // Stage 4: Complete
-      onProgress?.({
-        stage: "complete",
-        progress: 100,
-        message: "Download complete!",
-      });
-
-      return decryptedGame;
+      if (encryptionInfo.isPartiallyEncrypted) {
+        console.log("🔐 Game uses PARTIAL encryption - downloading dual blobs");
+        return await this.downloadPartiallyEncryptedGame(
+          game,
+          encryptionInfo,
+          onProgress,
+        );
+      } else {
+        console.log("🔒 Game uses FULL encryption - downloading single blob");
+        return await this.downloadFullyEncryptedGame(game, onProgress);
+      }
     } catch (error) {
       onProgress?.({
         stage: "error",
@@ -78,6 +134,157 @@ export class GameDownloadManager {
         message: error instanceof Error ? error.message : "Download failed",
       });
       throw error;
+    }
+  }
+
+  /**
+   * Download and reconstruct partially encrypted game (dual-blob approach)
+   */
+  private async downloadPartiallyEncryptedGame(
+    game: GameNFT,
+    encryptionInfo: GameEncryptionInfo,
+    onProgress?: (progress: DownloadProgress) => void,
+  ): Promise<Blob> {
+    // Stage 1: Download encrypted chunk
+    onProgress?.({
+      stage: "downloading",
+      progress: 25,
+      message: "Downloading encrypted chunk from Walrus...",
+    });
+
+    const encryptedChunk = await this.downloadFromWalrus(game.walrusBlobId);
+
+    // Stage 2: Download unencrypted chunk
+    onProgress?.({
+      stage: "downloading",
+      progress: 45,
+      message: "Downloading data chunk from Walrus...",
+    });
+
+    const unencryptedChunk = await this.downloadFromWalrus(
+      encryptionInfo.secondaryBlobId,
+    );
+
+    // Stage 3: Decrypt only the encrypted chunk
+    onProgress?.({
+      stage: "decrypting",
+      progress: 70,
+      message: "Decrypting encrypted chunk with Seal...",
+    });
+
+    const decryptedChunk = await this.decryptWithSeal(encryptedChunk, game);
+
+    // Stage 4: Reconstruct original file
+    onProgress?.({
+      stage: "reconstructing",
+      progress: 85,
+      message: "Reconstructing original file...",
+    });
+
+    const reconstructedFile = await this.reconstructFile(
+      decryptedChunk,
+      unencryptedChunk,
+      encryptionInfo,
+    );
+
+    onProgress?.({
+      stage: "complete",
+      progress: 100,
+      message: "Partial encryption download complete!",
+    });
+
+    return reconstructedFile;
+  }
+
+  /**
+   * Download fully encrypted game (legacy single-blob approach)
+   */
+  private async downloadFullyEncryptedGame(
+    game: GameNFT,
+    onProgress?: (progress: DownloadProgress) => void,
+  ): Promise<Blob> {
+    // Stage 1: Download encrypted game from Walrus
+    onProgress?.({
+      stage: "downloading",
+      progress: 30,
+      message: "Downloading encrypted game from Walrus...",
+    });
+
+    const encryptedGame = await this.downloadFromWalrus(game.walrusBlobId);
+
+    // Stage 2: Decrypt with Seal
+    onProgress?.({
+      stage: "decrypting",
+      progress: 70,
+      message: "Decrypting game with Seal...",
+    });
+
+    const decryptedGame = await this.decryptWithSeal(encryptedGame, game);
+
+    // Stage 3: Complete
+    onProgress?.({
+      stage: "complete",
+      progress: 100,
+      message: "Download complete!",
+    });
+
+    return decryptedGame;
+  }
+
+  /**
+   * Reconstruct original file from decrypted chunk + unencrypted chunk
+   */
+  private async reconstructFile(
+    decryptedChunk: Blob,
+    unencryptedChunk: ArrayBuffer,
+    encryptionInfo: GameEncryptionInfo,
+  ): Promise<Blob> {
+    try {
+      // Convert decrypted chunk to ArrayBuffer
+      const decryptedBuffer = await decryptedChunk.arrayBuffer();
+
+      console.log("🔧 Reconstructing file:", {
+        decryptedChunkSize: decryptedBuffer.byteLength,
+        unencryptedChunkSize: unencryptedChunk.byteLength,
+        totalReconstructedSize:
+          decryptedBuffer.byteLength + unencryptedChunk.byteLength,
+        enhancedMetadata: encryptionInfo.enhancedMetadata,
+      });
+
+      // Combine the chunks: encrypted chunk first, then unencrypted chunk
+      // This matches how the upload splits the file (beginning encrypted, rest unencrypted)
+      const reconstructedSize =
+        decryptedBuffer.byteLength + unencryptedChunk.byteLength;
+      const reconstructedBuffer = new ArrayBuffer(reconstructedSize);
+      const reconstructedView = new Uint8Array(reconstructedBuffer);
+
+      // Copy decrypted chunk to beginning
+      const decryptedView = new Uint8Array(decryptedBuffer);
+      reconstructedView.set(decryptedView, 0);
+
+      // Copy unencrypted chunk after decrypted chunk
+      const unencryptedView = new Uint8Array(unencryptedChunk);
+      reconstructedView.set(unencryptedView, decryptedBuffer.byteLength);
+
+      // Determine MIME type from enhanced metadata if available
+      let mimeType = "application/octet-stream";
+      if (encryptionInfo.enhancedMetadata?.gameFile?.type) {
+        mimeType = encryptionInfo.enhancedMetadata.gameFile.type;
+      }
+
+      console.log("✅ File reconstruction complete:", {
+        originalSize:
+          encryptionInfo.enhancedMetadata?.gameFile?.originalSize || "unknown",
+        reconstructedSize: reconstructedBuffer.byteLength,
+        mimeType,
+      });
+
+      return new Blob([reconstructedBuffer], { type: mimeType });
+    } catch (error) {
+      console.error("❌ File reconstruction failed:", error);
+      throw new Error(
+        `Failed to reconstruct original file: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 

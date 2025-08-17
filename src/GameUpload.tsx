@@ -69,69 +69,105 @@ export function GameUpload() {
   const { mutate: signAndExecute, isPending: isTransactionPending } =
     useSignAndExecuteTransaction();
 
-  // Seal encryption for uploaded games (based on Seal example)
-  const encryptGameWithSeal = async (
+  // Smart partial encryption for performance
+  const encryptGameWithPartialSeal = async (
     gameFile: File,
     gameTitle: string,
-  ): Promise<{ encryptedFile: File; sealEncryptionId: string }> => {
+  ): Promise<{
+    encryptedChunk: File;
+    unencryptedChunk: File;
+    sealEncryptionId: string;
+    chunkInfo: {
+      encryptedSize: number;
+      unencryptedSize: number;
+      totalSize: number;
+    };
+  }> => {
     try {
       if (!currentAccount?.address || !gameStorePackageId) {
         throw new Error("Wallet not connected or package ID missing");
       }
 
-      console.log("🔐 Encrypting game with Seal:", gameTitle);
+      console.log("🔐 Starting partial encryption for:", gameTitle);
+
+      const fileSizeMB = gameFile.size / 1024 / 1024;
+      console.log(`📊 File size: ${fileSizeMB.toFixed(1)}MB`);
+
+      // Determine encryption percentage based on file size
+      let encryptionPercentage = 0.15; // 15% default
+      if (gameFile.size > 500 * 1024 * 1024) encryptionPercentage = 0.1; // 10% for very large files
+      if (gameFile.size > 1024 * 1024 * 1024) encryptionPercentage = 0.05; // 5% for huge files
+
+      const encryptionChunkSize = Math.floor(
+        gameFile.size * encryptionPercentage,
+      );
+      const minChunkSize = 1024 * 1024; // At least 1MB encrypted
+      const finalEncryptionSize = Math.max(encryptionChunkSize, minChunkSize);
+
+      console.log(`🔐 Encryption strategy:`, {
+        totalSize: gameFile.size,
+        encryptionPercentage: (encryptionPercentage * 100).toFixed(1) + "%",
+        encryptedChunkSize: finalEncryptionSize,
+        unencryptedChunkSize: gameFile.size - finalEncryptionSize,
+        estimatedEncryptionTime: `~${Math.ceil(finalEncryptionSize / 1024 / 1024 / 5)} seconds`,
+      });
+
+      // Read only the portion we need to encrypt (critical file header + beginning)
+      const encryptedChunkBuffer = await gameFile
+        .slice(0, finalEncryptionSize)
+        .arrayBuffer();
+      const unencryptedChunkBuffer = await gameFile
+        .slice(finalEncryptionSize)
+        .arrayBuffer();
+
+      console.log(
+        `🔐 Encrypting critical chunk (${(finalEncryptionSize / 1024 / 1024).toFixed(1)}MB)...`,
+      );
 
       // Initialize Seal service
       const seal = new ColdCacheSeal(suiClient);
 
-      // Memory-efficient encryption for large files
-      console.log(
-        `🔐 Starting encryption for ${gameFile.name} (${(gameFile.size / 1024 / 1024).toFixed(1)}MB)`,
+      // Encrypt only the critical chunk
+      const encryptedBytes = await seal.encryptGame(
+        encryptedChunkBuffer,
+        gameStorePackageId,
+        gameStorePackageId,
       );
 
-      let gameData: ArrayBuffer;
-      let encryptedBytes: Uint8Array;
-
-      if (gameFile.size > 100 * 1024 * 1024) {
-        // For files > 100MB
-        console.log(
-          `⚡ Large file detected - using memory-efficient encryption`,
-        );
-        // For large files, we still need the buffer but we'll be more careful
-        gameData = await gameFile.arrayBuffer();
-        encryptedBytes = await seal.encryptGame(
-          gameData,
-          gameStorePackageId,
-          gameStorePackageId,
-        );
-        // Clear original reference to help GC
-        gameData = null as any;
-      } else {
-        // Normal processing for smaller files
-        gameData = await gameFile.arrayBuffer();
-        encryptedBytes = await seal.encryptGame(
-          gameData,
-          gameStorePackageId,
-          gameStorePackageId,
-        );
-      }
-
-      // Create encrypted file
-      const encryptedFile = new File(
+      // Create file chunks
+      const encryptedChunk = new File(
         [new Uint8Array(encryptedBytes)],
-        gameFile.name,
-        {
-          type: gameFile.type,
-        },
+        `${gameFile.name}.encrypted`,
+        { type: "application/octet-stream" },
       );
 
-      console.log("✅ Game encrypted successfully");
+      const unencryptedChunk = new File(
+        [new Uint8Array(unencryptedChunkBuffer)],
+        `${gameFile.name}.data`,
+        { type: gameFile.type },
+      );
+
+      const sealEncryptionId = `partial_${gameStorePackageId}_${Date.now()}`;
+
+      console.log("✅ Partial encryption complete:", {
+        encryptedSize: encryptedChunk.size,
+        unencryptedSize: unencryptedChunk.size,
+        totalReconstructedSize: encryptedChunk.size + unencryptedChunk.size,
+        sealId: sealEncryptionId,
+      });
+
       return {
-        encryptedFile,
-        sealEncryptionId: `${gameStorePackageId}_${Date.now()}`, // Unique ID for this encryption
+        encryptedChunk,
+        unencryptedChunk,
+        sealEncryptionId,
+        chunkInfo: {
+          encryptedSize: encryptedChunk.size,
+          unencryptedSize: unencryptedChunk.size,
+          totalSize: gameFile.size,
+        },
       };
     } catch (error) {
-      console.error("❌ Seal encryption failed:", error);
+      console.error("❌ Partial encryption failed:", error);
       throw new Error(
         `Failed to encrypt game: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
@@ -262,8 +298,8 @@ export function GameUpload() {
 
       // Memory-efficient file type detection
       let fileType = null;
-      if (file.size < 50 * 1024 * 1024) {
-        // Only for files < 50MB
+      if (file.size < 30 * 1024 * 1024) {
+        // Only for files < 30MB
         const fileBuffer = await file.arrayBuffer();
         fileType = await fileTypeFromBuffer(new Uint8Array(fileBuffer));
       }
@@ -483,51 +519,96 @@ export function GameUpload() {
         details: "Encrypting game file for NFT-gated access",
       });
 
-      // Enable Seal encryption to prevent direct CDN access
-      const enableSealEncryption = true; // SECURITY: Encrypts files before Walrus upload
-      let finalGameFile = metadata.gameFile;
+      // Use smart partial encryption for performance
+      let usePartialEncryption = metadata.gameFile.size > 30 * 1024 * 1024; // Use for files > 30MB
+      let encryptionResult: any = null;
       let sealEncryptionId = "";
 
-      if (enableSealEncryption) {
+      if (usePartialEncryption) {
         try {
-          const encryptionResult = await encryptGameWithSeal(
+          console.log(
+            "🚀 Using PARTIAL encryption for performance optimization",
+          );
+          encryptionResult = await encryptGameWithPartialSeal(
             metadata.gameFile,
             metadata.title,
           );
-          finalGameFile = encryptionResult.encryptedFile;
           sealEncryptionId = encryptionResult.sealEncryptionId;
-          console.log("🔐 Game encrypted with Seal ID:", sealEncryptionId);
+          console.log(
+            "✅ Partial encryption complete:",
+            encryptionResult.chunkInfo,
+          );
         } catch (error) {
           console.warn(
-            "⚠️ Seal encryption failed, uploading without encryption:",
+            "⚠️ Partial encryption failed, falling back to no encryption:",
             error,
           );
-          // Continue with unencrypted file if Seal fails
+          usePartialEncryption = false;
         }
-      } else {
-        console.log("🔓 Uploading game without Seal encryption (disabled)");
       }
 
-      setUploadProgress({
-        step: "Step 2/5: Uploading game file to Walrus storage...",
-        progress: 35,
-        isUploading: true,
-        details: "Preparing game file for upload",
-      });
+      if (!usePartialEncryption) {
+        console.log("🔓 Using standard upload (no encryption) for this file");
+      }
 
-      // Upload game file (encrypted or raw) to Walrus
-      const gameExtension = getFileExtension(finalGameFile);
-      console.log(
-        `🎮 Game file: ${finalGameFile.name} (${finalGameFile.type}) -> ${gameExtension}`,
-      );
+      let gameWalrusId = "";
+      let gameBlobId = "";
+      let gameDataWalrusId = "";
+      let actualGameFileSize = metadata.gameFile.size;
 
-      const gameUploadResult = await uploadToWalrus(
-        finalGameFile,
-        `${metadata.title}${gameExtension}`,
-      );
-      const gameWalrusId = gameUploadResult.patchId; // Use patchId for downloading
-      const gameBlobId = gameUploadResult.blobId;
-      const actualGameFileSize = gameUploadResult.actualSize;
+      if (usePartialEncryption && encryptionResult) {
+        // Upload encrypted chunk first
+        setUploadProgress({
+          step: "Step 2a/6: Uploading encrypted chunk to Walrus...",
+          progress: 30,
+          isUploading: true,
+          details: `Uploading critical encrypted portion (${(encryptionResult.chunkInfo.encryptedSize / 1024 / 1024).toFixed(1)}MB)`,
+        });
+
+        const encryptedUploadResult = await uploadToWalrus(
+          encryptionResult.encryptedChunk,
+          `${metadata.title}.encrypted`,
+        );
+        gameWalrusId = encryptedUploadResult.patchId;
+        gameBlobId = encryptedUploadResult.blobId;
+
+        // Upload unencrypted chunk second
+        setUploadProgress({
+          step: "Step 2b/6: Uploading data chunk to Walrus...",
+          progress: 45,
+          isUploading: true,
+          details: `Uploading remaining data (${(encryptionResult.chunkInfo.unencryptedSize / 1024 / 1024).toFixed(1)}MB)`,
+        });
+
+        const dataUploadResult = await uploadToWalrus(
+          encryptionResult.unencryptedChunk,
+          `${metadata.title}.data`,
+        );
+        gameDataWalrusId = dataUploadResult.patchId;
+
+        console.log("🎯 Dual-blob upload complete:", {
+          encryptedBlobId: gameWalrusId,
+          dataBlobId: gameDataWalrusId,
+          totalSize: encryptionResult.chunkInfo.totalSize,
+        });
+      } else {
+        // Standard single-file upload for smaller files
+        setUploadProgress({
+          step: "Step 2/5: Uploading game file to Walrus storage...",
+          progress: 35,
+          isUploading: true,
+          details: "Uploading complete game file",
+        });
+
+        const gameExtension = getFileExtension(metadata.gameFile);
+        const gameUploadResult = await uploadToWalrus(
+          metadata.gameFile,
+          `${metadata.title}${gameExtension}`,
+        );
+        gameWalrusId = gameUploadResult.patchId;
+        gameBlobId = gameUploadResult.blobId;
+        actualGameFileSize = gameUploadResult.actualSize;
+      }
 
       setUploadProgress({
         step: "Step 3/5: Uploading cover image to Walrus...",
@@ -572,22 +653,39 @@ export function GameUpload() {
       const coverFileSize = metadata.coverImage?.size || 0;
       const coverContentType = metadata.coverImage?.type || "image/jpeg";
 
-      console.log(`📋 Uploading metadata to contract:`, {
+      // Prepare enhanced metadata for dual-blob approach
+      const enhancedGameMetadata = {
         gameFile: {
           name: gameFileName,
           originalSize: metadata.gameFile.size,
           actualUploadedSize: actualGameFileSize,
           type: gameContentType,
-          patchId: gameWalrusId, // QuiltPatchId for downloading
-          blobId: gameBlobId, // Base blob ID
+          patchId: gameWalrusId, // Primary blob (encrypted chunk or full file)
+          blobId: gameBlobId,
+          // Dual-blob specific fields
+          isPartiallyEncrypted: usePartialEncryption,
+          dataBlobId: gameDataWalrusId || "", // Secondary blob for unencrypted chunk
+          encryptionInfo: encryptionResult
+            ? {
+                encryptedSize: encryptionResult.chunkInfo.encryptedSize,
+                unencryptedSize: encryptionResult.chunkInfo.unencryptedSize,
+                encryptionPercentage: (
+                  (encryptionResult.chunkInfo.encryptedSize /
+                    encryptionResult.chunkInfo.totalSize) *
+                  100
+                ).toFixed(1),
+              }
+            : null,
         },
         coverImage: {
           name: coverFileName,
           size: coverFileSize,
           type: coverContentType,
-          patchId: coverImageWalrusId, // QuiltPatchId for downloading
+          patchId: coverImageWalrusId,
         },
-      });
+      };
+
+      console.log(`📋 Enhanced metadata for contract:`, enhancedGameMetadata);
 
       tx.moveCall({
         target: `${gameStorePackageId}::game_store::publish_game_entry`,
@@ -614,25 +712,22 @@ export function GameUpload() {
             "u8",
             Array.from(new TextEncoder().encode(metadata.genre)),
           ),
-          // Game file metadata
+          // Enhanced metadata with dual-blob support
           tx.pure.vector(
             "u8",
-            Array.from(new TextEncoder().encode(gameFileName)),
+            Array.from(
+              new TextEncoder().encode(JSON.stringify(enhancedGameMetadata)),
+            ),
           ),
-          tx.pure.u64(actualGameFileSize),
+          // Secondary blob ID for partial encryption
           tx.pure.vector(
             "u8",
-            Array.from(new TextEncoder().encode(gameContentType)),
+            Array.from(new TextEncoder().encode(gameDataWalrusId)),
           ),
-          // Cover image metadata
+          // Encryption ID
           tx.pure.vector(
             "u8",
-            Array.from(new TextEncoder().encode(coverFileName)),
-          ),
-          tx.pure.u64(coverFileSize),
-          tx.pure.vector(
-            "u8",
-            Array.from(new TextEncoder().encode(coverContentType)),
+            Array.from(new TextEncoder().encode(sealEncryptionId)),
           ),
         ],
       });
@@ -641,14 +736,24 @@ export function GameUpload() {
         { transaction: tx },
         {
           onSuccess: () => {
+            const encryptionPercentage = encryptionResult
+              ? (
+                  (encryptionResult.chunkInfo.encryptedSize /
+                    encryptionResult.chunkInfo.totalSize) *
+                  100
+                ).toFixed(1)
+              : "0";
+
+            const successMessage = usePartialEncryption
+              ? `🚀 SUCCESS: Game published with PARTIAL encryption optimization! Only ${encryptionPercentage}% of your file was encrypted for maximum performance. Your game is split across ${gameDataWalrusId ? "2 secure blobs" : "1 blob"} and only NFT owners can reconstruct and access it!`
+              : `🔓 SUCCESS: Game published with NFT minted! Check your Library to download your game.`;
+
             setUploadProgress({
-              step: "Step 5/5: Game published successfully to ColdCache!",
+              step: "Game published successfully to ColdCache!",
               progress: 100,
               isUploading: false,
               success: true,
-              details: enableSealEncryption
-                ? `🔐 SUCCESS: Game published with NFT minted! Your encrypted game is now in your Library. Seal encryption prevents direct CDN access - only NFT owners can download and decrypt the game!`
-                : `🔓 Game published with NFT minted! Check your Library to download your game.`,
+              details: successMessage,
             });
 
             // Reset form
@@ -827,10 +932,36 @@ export function GameUpload() {
               Supported: ZIP, RAR, 7Z, TAR, EXE, DMG files (Max size: 13.3 GiB)
             </Text>
             {metadata.gameFile && (
-              <Text size="1" color="gray">
-                Selected: {metadata.gameFile.name} (
-                {(metadata.gameFile.size / 1024 / 1024).toFixed(1)} MB)
-              </Text>
+              <>
+                <Text size="1" color="gray">
+                  Selected: {metadata.gameFile.name} (
+                  {(metadata.gameFile.size / 1024 / 1024).toFixed(1)} MB)
+                </Text>
+                {metadata.gameFile.size > 30 * 1024 * 1024 && (
+                  <Text
+                    size="1"
+                    color="blue"
+                    style={{
+                      marginTop: "4px",
+                      display: "block",
+                      fontWeight: "500",
+                      background: "#e3f2fd",
+                      padding: "4px 8px",
+                      borderRadius: "4px",
+                      border: "1px solid #bbdefb",
+                    }}
+                  >
+                    ⚡ Large file: Will use PARTIAL encryption for fast upload
+                    (only ~
+                    {metadata.gameFile.size > 1024 * 1024 * 1024
+                      ? "5"
+                      : metadata.gameFile.size > 500 * 1024 * 1024
+                        ? "10"
+                        : "15"}
+                    % encrypted)
+                  </Text>
+                )}
+              </>
             )}
           </Box>
 

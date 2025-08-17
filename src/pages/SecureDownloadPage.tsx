@@ -31,7 +31,7 @@ import {
 } from "../schemas/nft";
 
 interface DownloadState {
-  stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
+  stage: "verifying" | "downloading" | "decrypting" | "reconstructing" | "complete" | "error";
   progress: number;
   message: string;
 }

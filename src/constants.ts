@@ -9,14 +9,14 @@ export const TESTNET_NFT_PACKAGE_ID =
   "0x4192d3079a50c93875b505774f9cec350e5f0806ce4ed8b34cb847e929713cfc"; // Latest deployment with Seal integration
 export const MAINNET_NFT_PACKAGE_ID = "0xTODO";
 
-// Game Store Package IDs (LATEST DEPLOYMENT WITH PUBLISHER MANAGEMENT & REVENUE CONTROLS)
+// Game Store Package IDs (LATEST DEPLOYMENT WITH PARTIAL ENCRYPTION SUPPORT)
 export const DEVNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 export const TESTNET_GAME_STORE_PACKAGE_ID =
-  "0x1708e46c71fc5805fbd6f04339bd04bc0566b85a73fd687d0481d686c127c5f6"; // Latest deployment with publisher dashboard functions
+  "0xb94e12661bbb311c6f5605f3f546da5b628fe439e716c43fc1e7295bbae9705d"; // Latest deployment with partial encryption support
 export const MAINNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 
-// GameStore shared object IDs (LATEST DEPLOYMENT WITH PUBLISHER MANAGEMENT & REVENUE CONTROLS)
+// GameStore shared object IDs (LATEST DEPLOYMENT WITH PARTIAL ENCRYPTION SUPPORT)
 export const DEVNET_GAME_STORE_OBJECT_ID = "0xTODO";
 export const TESTNET_GAME_STORE_OBJECT_ID =
-  "0x43e2dbb0e907ac9a99de23e229879aa32074a0c1ef8f6a3283252fb2392202eb"; // Latest deployment with publisher dashboard functions
+  "0xa8e8753fda5ec086a170d6800205079020c0a9346670bfa6c98e81f63525fd49"; // Latest deployment with partial encryption support
 export const MAINNET_GAME_STORE_OBJECT_ID = "0xTODO";

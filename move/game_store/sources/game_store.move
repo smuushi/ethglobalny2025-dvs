@@ -48,6 +48,10 @@ module game_store::game_store {
         revenue_balance: Coin<SUI>,
         max_supply: u64, // 0 means unlimited
         withdrawn_amount: u64,
+        // Partial encryption support
+        enhanced_metadata: String, // JSON metadata with dual-blob info
+        secondary_blob_id: String, // For unencrypted chunk in partial encryption
+        seal_encryption_id: String, // Seal encryption identifier
     }
 
     public struct GameNFT has key, store {
@@ -161,17 +165,15 @@ module game_store::game_store {
         walrus_blob_id: vector<u8>,
         cover_image_blob_id: vector<u8>,
         genre: vector<u8>,
-        // Game file metadata
-        game_filename: vector<u8>,
-        game_file_size: u64,
-        game_content_type: vector<u8>,
-        // Cover image metadata
-        cover_filename: vector<u8>,
-        cover_file_size: u64,
-        cover_content_type: vector<u8>,
+        // Enhanced metadata with dual-blob support
+        enhanced_metadata: vector<u8>,
+        // Secondary blob ID for partial encryption
+        secondary_blob_id: vector<u8>,
+        // Encryption ID
+        seal_encryption_id: vector<u8>,
         ctx: &mut TxContext
     ) {
-        let (_game_id, publisher_nft) = publish_game(
+        let (_game_id, publisher_nft) = publish_game_with_encryption(
             store,
             title,
             description,
@@ -179,12 +181,9 @@ module game_store::game_store {
             walrus_blob_id,
             cover_image_blob_id,
             genre,
-            game_filename,
-            game_file_size,
-            game_content_type,
-            cover_filename,
-            cover_file_size,
-            cover_content_type,
+            enhanced_metadata,
+            secondary_blob_id,
+            seal_encryption_id,
             ctx
         );
         
@@ -192,6 +191,103 @@ module game_store::game_store {
         transfer::public_transfer(publisher_nft, tx_context::sender(ctx));
     }
 
+    // New function with enhanced metadata and partial encryption support
+    public fun publish_game_with_encryption(
+        store: &mut GameStore,
+        title: vector<u8>,
+        description: vector<u8>,
+        price: u64,
+        walrus_blob_id: vector<u8>,
+        cover_image_blob_id: vector<u8>,
+        genre: vector<u8>,
+        enhanced_metadata: vector<u8>,
+        secondary_blob_id: vector<u8>,
+        seal_encryption_id: vector<u8>,
+        ctx: &mut TxContext
+    ): (ID, GameNFT) {
+        // Parse enhanced metadata JSON to extract file info
+        let enhanced_metadata_str = string::utf8(enhanced_metadata);
+        
+        // Create default metadata (enhanced metadata contains the real details)
+        let game_metadata = GameFileMetadata {
+            original_filename: string::utf8(b"game_file"),
+            file_size: 0, // Will be in enhanced metadata
+            content_type: string::utf8(b"application/octet-stream"),
+            upload_timestamp: tx_context::epoch_timestamp_ms(ctx),
+        };
+
+        let cover_metadata = GameFileMetadata {
+            original_filename: string::utf8(b"cover_image"),
+            file_size: 0, // Will be in enhanced metadata
+            content_type: string::utf8(b"image/jpeg"),
+            upload_timestamp: tx_context::epoch_timestamp_ms(ctx),
+        };
+
+        let game = Game {
+            id: object::new(ctx),
+            title: string::utf8(title),
+            description: string::utf8(description),
+            price,
+            publisher: tx_context::sender(ctx),
+            walrus_blob_id: string::utf8(walrus_blob_id),
+            cover_image_blob_id: string::utf8(cover_image_blob_id),
+            genre: string::utf8(genre),
+            publish_date: tx_context::epoch(ctx),
+            is_active: true,
+            total_sales: 0,
+            game_file_metadata: game_metadata,
+            cover_image_metadata: cover_metadata,
+            revenue_balance: coin::zero<SUI>(ctx),
+            max_supply: 0, // 0 means unlimited
+            withdrawn_amount: 0,
+            // New partial encryption fields
+            enhanced_metadata: enhanced_metadata_str,
+            secondary_blob_id: string::utf8(secondary_blob_id),
+            seal_encryption_id: string::utf8(seal_encryption_id),
+        };
+        
+        let game_id = object::id(&game);
+        vector::push_back(&mut store.games, game_id);
+        store.total_games = store.total_games + 1;
+
+        // Mint NFT for the publisher with complete game metadata
+        let publisher_nft = GameNFT {
+            id: object::new(ctx),
+            game_id,
+            title: game.title,
+            description: game.description,
+            price: game.price,
+            publisher: game.publisher,
+            walrus_blob_id: game.walrus_blob_id,
+            cover_image_blob_id: game.cover_image_blob_id,
+            genre: game.genre,
+            publish_date: game.publish_date,
+            purchase_date: tx_context::epoch(ctx),
+            is_publisher_nft: true,
+        };
+
+        let nft_id = object::id(&publisher_nft);
+
+        event::emit(GamePublished {
+            game_id,
+            title: game.title,
+            publisher: game.publisher,
+            price: game.price,
+            walrus_blob_id: game.walrus_blob_id,
+        });
+
+        event::emit(PublisherNFTMinted {
+            game_id,
+            publisher: game.publisher,
+            nft_id,
+            title: game.title,
+        });
+
+        transfer::share_object(game);
+        (game_id, publisher_nft)
+    }
+
+    // Legacy function for backwards compatibility
     public fun publish_game(
         store: &mut GameStore,
         title: vector<u8>,
@@ -241,6 +337,10 @@ module game_store::game_store {
             revenue_balance: coin::zero<SUI>(ctx),
             max_supply: 0, // 0 means unlimited
             withdrawn_amount: 0,
+            // Default values for new fields
+            enhanced_metadata: string::utf8(b"{}"),
+            secondary_blob_id: string::utf8(b""),
+            seal_encryption_id: string::utf8(b""),
         };
         
         let game_id = object::id(&game);
@@ -509,6 +609,20 @@ module game_store::game_store {
             game.max_supply,
             game.is_active
         )
+    }
+
+    /// Get enhanced metadata and partial encryption info (public view)
+    public fun get_game_encryption_info(game: &Game): (String, String, String) {
+        (
+            game.enhanced_metadata,
+            game.secondary_blob_id,
+            game.seal_encryption_id
+        )
+    }
+
+    /// Check if game uses partial encryption (public view)
+    public fun is_partially_encrypted(game: &Game): bool {
+        !std::string::is_empty(&game.secondary_blob_id)
     }
     
     /// Withdraw all available revenue (publisher only)
