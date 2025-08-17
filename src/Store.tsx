@@ -114,7 +114,7 @@ export function Store() {
       console.log(
         `📁 Creating cover image blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
       );
-      const imageBlob = new Blob([imageBytes], { type: mimeType });
+      const imageBlob = new Blob([Uint8Array.from(imageBytes)], { type: mimeType });
 
       // Create download link with correct extension
       const downloadUrl = URL.createObjectURL(imageBlob);
@@ -253,7 +253,7 @@ export function Store() {
       console.log(
         `📁 Creating game file blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
       );
-      const gameBlob = new Blob([gameBytes], { type: mimeType });
+      const gameBlob = new Blob([Uint8Array.from(gameBytes)], { type: mimeType });
 
       // Create download link with correct extension
       const downloadUrl = URL.createObjectURL(gameBlob);
