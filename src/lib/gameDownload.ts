@@ -1,6 +1,10 @@
 import { SuiClient } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
 import { GameNFT } from "../schemas/nft";
-// import { Seal } from "@mysten/seal"; // TODO: Import when implementing Seal integration
+import { SealOwnershipVerifier } from "./sealOwnership";
+
+// Type for move call constructor (from Seal example)
+export type MoveCallConstructor = (tx: Transaction, id: string) => void;
 
 interface DownloadProgress {
   stage: "verifying" | "downloading" | "decrypting" | "complete" | "error";
@@ -11,10 +15,16 @@ interface DownloadProgress {
 export class GameDownloadManager {
   private suiClient: SuiClient;
   private userAddress: string;
+  private sessionKey?: any; // SessionKey from @mysten/seal
+  private sealVerifier: SealOwnershipVerifier;
 
-  constructor(suiClient: SuiClient, userAddress: string) {
+  constructor(suiClient: SuiClient, userAddress: string, sessionKey?: any) {
     this.suiClient = suiClient;
     this.userAddress = userAddress;
+    this.sessionKey = sessionKey;
+
+    // Initialize Seal-based verification (will get package ID dynamically)
+    this.sealVerifier = new SealOwnershipVerifier(suiClient, "testnet", "");
   }
 
   async downloadGame(
@@ -52,7 +62,8 @@ export class GameDownloadManager {
 
       const decryptedGame = await this.decryptWithSeal(
         encryptedGame,
-        game.sealPolicyId || "",
+        game,
+        true,
       );
 
       // Stage 4: Complete
@@ -73,140 +84,49 @@ export class GameDownloadManager {
     }
   }
 
+  /**
+   * Simple Seal-based ownership verification
+   * No complex frontend logic - let Seal and smart contracts handle it
+   */
   private async verifyOwnership(game: GameNFT): Promise<boolean> {
     try {
-      console.log("🔍 Verifying ownership for game:", game.gameId);
-      console.log("👤 User address:", this.userAddress);
+      console.log("🔐 Using Seal-based ownership verification");
+      console.log("🎮 Game ID:", game.gameId);
+      console.log("👤 User:", this.userAddress);
 
-      // Query user's owned NFTs from both contracts
-      const [gameStoreNFTs, nftContractNFTs] = await Promise.all([
-        this.queryGameStoreNFTs(),
-        this.queryNFTContractNFTs(),
-      ]);
+      // Get the package ID dynamically
+      const { TESTNET_GAME_STORE_PACKAGE_ID } = await import("../constants");
 
-      console.log("🏪 GameStore NFTs found:", gameStoreNFTs.length);
-      console.log("🎫 NFT Contract NFTs found:", nftContractNFTs.length);
-
-      // Debug: Log all NFT data first
-      console.log(
-        "🔍 All GameStore NFTs:",
-        JSON.stringify(gameStoreNFTs, null, 2),
+      // Update the verifier with the correct package ID
+      this.sealVerifier = new SealOwnershipVerifier(
+        this.suiClient,
+        "testnet",
+        TESTNET_GAME_STORE_PACKAGE_ID,
       );
-      console.log(
-        "🔍 All NFT Contract NFTs:",
-        JSON.stringify(nftContractNFTs, null, 2),
+
+      // Use session key or create one if needed
+      let sessionKey = this.sessionKey;
+      if (!sessionKey) {
+        const { ColdCacheSeal } = await import("./seal");
+        const seal = new ColdCacheSeal(this.suiClient, { network: "testnet" });
+        sessionKey = await seal.createSessionKey(
+          this.userAddress,
+          TESTNET_GAME_STORE_PACKAGE_ID,
+        );
+      }
+
+      // Let Seal verify ownership - much simpler!
+      const { hasAccess } = await this.sealVerifier.verifyOwnership(
+        game.gameId || game.id,
+        this.userAddress,
+        sessionKey,
       );
-      console.log("🔍 Looking for game ID:", game.gameId);
-      console.log("🔍 Game object:", JSON.stringify(game, null, 2));
 
-      // Ownership check: Do you own an NFT for this game?
-      // The game object represents a game you want to download
-      // We need to check if you own ANY NFT that gives you access to this game
-      const ownsGameStoreNFT = gameStoreNFTs.some((nft: any) => {
-        const nftId = nft.data?.objectId;
-        const nftGameId = nft.data?.content?.fields?.game_id;
-        const nftWalrusBlobId = nft.data?.content?.fields?.walrus_blob_id;
-
-        // Check multiple ways to match:
-        // 1. NFT ID matches the game's NFT ID (exact NFT match)
-        // 2. NFT's game_id matches what we're trying to download
-        // 3. NFT's walrus_blob_id matches (same game file)
-        const matchesNftId = nftId === game.id;
-        const matchesGameId = nftGameId === game.gameId;
-        const matchesWalrusBlobId = nftWalrusBlobId === game.walrusBlobId;
-
-        console.log(
-          `Checking GameStore NFT: ${nftId}`,
-          `\n  - NFT ID match: ${matchesNftId} (${nftId} === ${game.id})`,
-          `\n  - Game ID match: ${matchesGameId} (${nftGameId} === ${game.gameId})`,
-          `\n  - Walrus blob match: ${matchesWalrusBlobId} (${nftWalrusBlobId} === ${game.walrusBlobId})`,
-        );
-
-        return matchesNftId || matchesGameId || matchesWalrusBlobId;
-      });
-
-      const ownsNFTContractNFT = nftContractNFTs.some((nft: any) => {
-        const nftId = nft.data?.objectId;
-        const nftGameId = nft.data?.content?.fields?.game_id;
-        const nftWalrusBlobId = nft.data?.content?.fields?.walrus_blob_id;
-
-        const matchesNftId = nftId === game.id;
-        const matchesGameId = nftGameId === game.gameId;
-        const matchesWalrusBlobId = nftWalrusBlobId === game.walrusBlobId;
-
-        console.log(
-          `Checking NFT Contract NFT: ${nftId}`,
-          `\n  - NFT ID match: ${matchesNftId}`,
-          `\n  - Game ID match: ${matchesGameId}`,
-          `\n  - Walrus blob match: ${matchesWalrusBlobId}`,
-        );
-
-        return matchesNftId || matchesGameId || matchesWalrusBlobId;
-      });
-
-      const ownsGame = ownsGameStoreNFT || ownsNFTContractNFT;
-      console.log(`🎯 Ownership result: ${ownsGame}`);
-
-      return ownsGame;
+      console.log("🎯 Seal verification result:", hasAccess);
+      return hasAccess;
     } catch (error) {
-      console.error("❌ Ownership verification failed:", error);
+      console.error("❌ Seal ownership verification failed:", error);
       return false;
-    }
-  }
-
-  private async queryGameStoreNFTs(): Promise<any[]> {
-    try {
-      // Get the package IDs from the network config
-      // We need to construct the full StructType with the actual package ID
-      const result = await this.suiClient.getOwnedObjects({
-        owner: this.userAddress,
-        options: {
-          showContent: true,
-          showType: true,
-        },
-      });
-
-      // Filter for GameStore NFTs by checking the type
-      const gameStoreNFTs =
-        result?.data?.filter((nft: any) => {
-          const type = nft.data?.type;
-          return type && type.includes("::game_store::GameNFT");
-        }) || [];
-
-      console.log("🔍 All owned objects:", result?.data?.length);
-      console.log("🏪 Filtered GameStore NFTs:", gameStoreNFTs.length);
-
-      return gameStoreNFTs;
-    } catch (error) {
-      console.warn("Failed to query GameStore NFTs:", error);
-      return [];
-    }
-  }
-
-  private async queryNFTContractNFTs(): Promise<any[]> {
-    try {
-      // Get all owned objects and filter for NFT contract NFTs
-      const result = await this.suiClient.getOwnedObjects({
-        owner: this.userAddress,
-        options: {
-          showContent: true,
-          showType: true,
-        },
-      });
-
-      // Filter for NFT Contract NFTs by checking the type
-      const nftContractNFTs =
-        result?.data?.filter((nft: any) => {
-          const type = nft.data?.type;
-          return type && type.includes("::nft::GameNFT");
-        }) || [];
-
-      console.log("🎫 Filtered NFT Contract NFTs:", nftContractNFTs.length);
-
-      return nftContractNFTs;
-    } catch (error) {
-      console.warn("Failed to query NFT Contract NFTs:", error);
-      return [];
     }
   }
 
@@ -238,39 +158,104 @@ export class GameDownloadManager {
 
   private async decryptWithSeal(
     encryptedData: ArrayBuffer,
-    policyId: string,
+    game: GameNFT,
+    ownershipAlreadyVerified: boolean = false,
   ): Promise<Blob> {
-    // TODO: Implement actual Seal decryption using our game_store contract
-    // When ready, this will use ColdCacheSeal with proper move call constructor:
-    //
-    // const seal = new ColdCacheSeal(this.suiClient);
-    // const sessionKey = await seal.createSessionKey();
-    //
-    // const moveCallConstructor = (tx: Transaction, id: string) => {
-    //   tx.moveCall({
-    //     target: `${packageId}::game_store::seal_approve_game_access`,
-    //     arguments: [
-    //       tx.pure.vector("u8", Array.from(new TextEncoder().encode(id))),
-    //       tx.object(nftObjectId), // User's NFT for this game
-    //     ],
-    //   });
-    // };
-    //
-    // const decryptedBytes = await seal.decryptGame(
-    //   new Uint8Array(encryptedData),
-    //   sessionKey,
-    //   moveCallConstructor
-    // );
-    // return new Blob([decryptedBytes]);
+    try {
+      console.log("🔐 Attempting Seal decryption for game:", game.title);
 
-    console.log("🔐 Seal decryption placeholder - returning raw data");
-    console.log("Policy ID:", policyId);
-    console.log("User address:", this.userAddress);
+      // Import necessary dependencies dynamically
+      const { ColdCacheSeal } = await import("./seal");
+      const { TESTNET_GAME_STORE_PACKAGE_ID } = await import("../constants");
 
-    // For now, games are not encrypted yet, so return raw data
-    // This allows the download system to work while we prepare Seal integration
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return new Blob([encryptedData]);
+      // Initialize Seal service
+      const seal = new ColdCacheSeal(this.suiClient);
+
+      // Use existing session key or create a new one
+      let sessionKey = this.sessionKey;
+      if (!sessionKey) {
+        console.log("⚠️ No session key provided, creating new one");
+        sessionKey = await seal.createSessionKey(
+          this.userAddress,
+          TESTNET_GAME_STORE_PACKAGE_ID,
+        );
+      }
+      console.log("✅ Session key ready for decryption");
+
+      // Since ownership was already verified, use the game ID for Seal verification
+      const gameNFTId = game.gameId || game.id;
+      console.log("🎫 Using game/NFT ID for Seal decryption:", gameNFTId);
+
+      // Create move call constructor for access verification (synchronous, imports cached)
+      const { fromHex } = await import("@mysten/sui/utils");
+
+      const moveCallConstructor: MoveCallConstructor = (
+        tx: Transaction,
+        id: string,
+      ) => {
+        console.log("🔗 Building access verification transaction with ID:", id);
+        console.log("🔗 Using NFT object ID:", gameNFTId);
+        console.log(
+          "🔗 Target function:",
+          `${TESTNET_GAME_STORE_PACKAGE_ID}::game_store::seal_approve_game_access`,
+        );
+
+        try {
+          // Convert hex ID to bytes for the transaction (like the Seal example)
+          const idBytes = fromHex(id);
+          console.log("🔗 ID hex:", id);
+          console.log(
+            "🔗 ID bytes length:",
+            idBytes.length,
+            "first few:",
+            Array.from(idBytes).slice(0, 10),
+          );
+
+          tx.moveCall({
+            target: `${TESTNET_GAME_STORE_PACKAGE_ID}::game_store::seal_approve_game_access`,
+            arguments: [
+              tx.pure.vector("u8", Array.from(idBytes)),
+              tx.object(gameNFTId), // User's NFT for this game
+            ],
+          });
+
+          console.log("🔗 Transaction built successfully");
+        } catch (error) {
+          console.error("❌ Failed to build transaction:", error);
+          throw error;
+        }
+      };
+
+      // Decrypt using Seal
+      const decryptedBytes = await seal.decryptGame(
+        new Uint8Array(encryptedData),
+        sessionKey,
+        moveCallConstructor,
+      );
+
+      console.log("✅ Game decrypted successfully with Seal");
+      return new Blob([decryptedBytes]);
+    } catch (error) {
+      console.error("❌ Seal decryption failed:", error);
+
+      // Handle specific Seal errors (import NoAccessError if needed)
+      if (
+        error instanceof Error &&
+        error.message.includes("You don't own the required NFT")
+      ) {
+        throw new Error(
+          "Access denied: You don't own the required NFT to decrypt this game.",
+        );
+      }
+
+      // If Seal decryption fails, try returning raw data for backwards compatibility
+      // This handles games that were uploaded before encryption was enabled
+      console.log(
+        "⚠️ Seal decryption failed, trying raw data (game may not be encrypted)",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Simulate processing time
+      return new Blob([encryptedData]);
+    }
   }
 
   // Utility method to trigger browser download

@@ -9,9 +9,10 @@ import { GameNFT } from "../schemas/nft";
  * This creates a backdoor URL that requires wallet authentication and NFT ownership verification
  */
 export function generateSecureDownloadUrl(game: GameNFT): string {
-  // Use the game's NFT ID as the secure identifier
-  // This could be the NFT object ID, game ID, or Walrus blob ID
-  const secureId = game.id; // Primary identifier (NFT object ID)
+  // Use the underlying game ID as the secure identifier
+  // This allows all owners of the same game to use the same download URL
+  // while still requiring NFT ownership verification for access
+  const secureId = game.gameId || game.id; // Primary identifier (Game ID, fallback to NFT ID)
 
   return `/download/${secureId}`;
 }

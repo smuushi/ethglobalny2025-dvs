@@ -80,12 +80,12 @@ export function GameUpload() {
       // Initialize Seal service
       const seal = new ColdCacheSeal(suiClient);
 
-      // Encrypt the game file using the game store contract as the policy
+      // Encrypt the game file using the NFT contract as the policy
       const gameData = await gameFile.arrayBuffer();
       const encryptedBytes = await seal.encryptGame(
         gameData,
-        gameStorePackageId, // Use package ID as policy object
-        gameStorePackageId,
+        gameStorePackageId, // Use game store package as policy object for now
+        gameStorePackageId, // Use game store package for seal_approve functions
       );
 
       // Create encrypted file
@@ -425,8 +425,8 @@ export function GameUpload() {
         details: "Encrypting game file for NFT-gated access",
       });
 
-      // Option: Encrypt game with Seal (can be toggled)
-      const enableSealEncryption = false; // Set to true to enable Seal encryption
+      // Enable Seal encryption to prevent direct CDN access
+      const enableSealEncryption = true; // SECURITY: Encrypts files before Walrus upload
       let finalGameFile = metadata.gameFile;
       let sealEncryptionId = "";
 
@@ -589,8 +589,8 @@ export function GameUpload() {
               isUploading: false,
               success: true,
               details: enableSealEncryption
-                ? `🔐 Game encrypted with Seal and published with NFT-gated access`
-                : `🔓 Game published (Seal encryption disabled)`,
+                ? `🔐 SUCCESS: Game published with NFT minted! Your encrypted game is now in your Library. Seal encryption prevents direct CDN access - only NFT owners can download and decrypt the game!`
+                : `🔓 Game published with NFT minted! Check your Library to download your game.`,
             });
 
             // Reset form

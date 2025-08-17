@@ -17,9 +17,11 @@ import {
   useSuiClientQuery,
   useSuiClient,
   ConnectButton,
+  useSignPersonalMessage,
 } from "@mysten/dapp-kit";
 import { useNetworkVariable } from "../networkConfig";
 import { GameDownloadManager } from "../lib/gameDownload";
+import { ColdCacheSeal } from "../lib/seal";
 import { iglooTheme, iglooStyles } from "../theme";
 import {
   GameNFT,
@@ -40,6 +42,7 @@ export function SecureDownloadPage() {
   const suiClient = useSuiClient();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const nftPackageId = useNetworkVariable("nftPackageId");
+  const { mutate: signPersonalMessage } = useSignPersonalMessage();
 
   const [downloadState, setDownloadState] = useState<DownloadState | null>(
     null,
@@ -89,8 +92,9 @@ export function SecureDownloadPage() {
     if (!currentAccount?.address || !gameId || accessChecked) return;
 
     const verifyAccess = async () => {
-      console.log("🔐 Verifying backdoor access for game:", gameId);
+      console.log("🔐 Verifying access for game ID:", gameId);
       console.log("👤 User address:", currentAccount.address);
+      console.log("🎯 New URL scheme: Game ID based (not NFT ID based)");
 
       try {
         // Parse all owned NFTs
@@ -107,27 +111,105 @@ export function SecureDownloadPage() {
         console.log("🏪 GameStore NFTs:", gameStoreNFTList.length);
         console.log("🎫 NFT Contract NFTs:", nftList.length);
 
+        // Debug: Log all owned NFTs for verification
+        console.log(
+          "🔍 DEBUG: All owned NFT IDs:",
+          [...gameStoreNFTList, ...nftList].map((nft) => nft.id),
+        );
+        console.log("🔍 DEBUG: Looking for gameId:", gameId);
+
         // Find the specific game being requested
         let targetGame: GameNFT | null = null;
         let hasAccess = false;
 
-        // Check if user owns the specific game NFT or has access through game ID
+        // Check if user owns an NFT for the requested game
+        // The gameId parameter is now the underlying game ID (not NFT ID)
         for (const nft of [...gameStoreNFTList, ...nftList]) {
-          // Match by exact NFT ID, game ID, or Walrus blob ID
+          console.log("🔍 DEBUG: Checking NFT:", {
+            nftId: nft.id,
+            nftGameId: nft.gameId,
+            nftWalrusBlobId: nft.walrusBlobId,
+            urlGameId: gameId,
+            idMatch: nft.id === gameId,
+            gameIdMatch: nft.gameId === gameId,
+            walrusMatch: nft.walrusBlobId === gameId,
+          });
+
+          // PRIORITY MATCHING (Game ID based system):
+          // 1. NFT's game_id matches the requested game (primary case)
+          // 2. NFT ID matches (backward compatibility)
+          // 3. Walrus blob ID matches (shared file access)
           if (
-            nft.id === gameId ||
-            nft.gameId === gameId ||
-            nft.walrusBlobId === gameId
+            nft.gameId === gameId || // Primary: game ownership
+            nft.id === gameId || // Fallback: direct NFT ID
+            nft.walrusBlobId === gameId // Fallback: shared file
           ) {
             targetGame = nft;
             hasAccess = true;
-            console.log("✅ Access granted via NFT:", nft.id);
+            console.log(
+              "✅ Access granted via NFT:",
+              nft.id,
+              "for game:",
+              gameId,
+            );
+            console.log("🎮 DEBUG: Found target game data:", targetGame);
             break;
           }
         }
 
         if (targetGame) {
-          setGameData(targetGame);
+          // If we found an NFT that grants access, we need to construct the game data for download
+          // The user should download the actual game file, not the NFT metadata
+          let gameDataForDownload = targetGame;
+
+          // If this NFT has a game_id (meaning it's tied to a published game),
+          // we should fetch the actual game data for the download
+          if (targetGame.gameId && targetGame.gameId !== targetGame.id) {
+            try {
+              // Fetch the actual published game data
+              const publishedGameResponse = await suiClient.getObject({
+                id: targetGame.gameId,
+                options: { showContent: true, showDisplay: true },
+              });
+
+              if (publishedGameResponse?.data?.content) {
+                const gameContent = publishedGameResponse.data.content as any;
+                const fields = gameContent.fields;
+
+                // Construct the game data object for download
+                gameDataForDownload = {
+                  id: targetGame.gameId, // Use game ID as the primary identifier
+                  gameId: targetGame.gameId,
+                  title: fields.title || targetGame.title,
+                  description: fields.description || targetGame.description,
+                  genre: fields.genre || targetGame.genre,
+                  price: fields.price || targetGame.price,
+                  publisher: fields.publisher || targetGame.publisher,
+                  walrusBlobId:
+                    fields.walrus_blob_id || targetGame.walrusBlobId,
+                  coverImageBlobId:
+                    fields.cover_image_blob_id || targetGame.coverImageBlobId,
+                  sealPolicyId: targetGame.sealPolicyId || "",
+                  publishDate: fields.publish_date || targetGame.publishDate,
+                  mintDate: fields.publish_date || targetGame.mintDate,
+                  isPublished: true,
+                };
+
+                console.log(
+                  "🎮 DEBUG: Constructed game data from published game:",
+                  gameDataForDownload,
+                );
+              }
+            } catch (error) {
+              console.log(
+                "⚠️ Could not fetch published game data, using NFT data:",
+                error,
+              );
+              // Fall back to using NFT data directly
+            }
+          }
+
+          setGameData(gameDataForDownload);
         }
 
         setAccessGranted(hasAccess);
@@ -160,10 +242,70 @@ export function SecureDownloadPage() {
     if (!currentAccount?.address || !gameData) return;
 
     try {
+      setDownloadState({
+        stage: "verifying",
+        progress: 10,
+        message: "🔑 Creating secure session key...",
+      });
+
+      // Import Seal dependencies
+      const { SessionKey } = await import("@mysten/seal");
+      const { ColdCacheSeal } = await import("../lib/seal");
+
+      // Initialize Seal service
+      const seal = new ColdCacheSeal(suiClient);
+
+      // Create session key for secure download
+      const sessionKey = await SessionKey.create({
+        address: currentAccount.address,
+        packageId: gameStorePackageId,
+        ttlMin: 10, // 10 minutes TTL
+        suiClient: suiClient,
+      });
+
+      // Request user signature for session key
+      await new Promise<void>((resolve, reject) => {
+        signPersonalMessage(
+          {
+            message: sessionKey.getPersonalMessage(),
+          },
+          {
+            onSuccess: async (result) => {
+              try {
+                await sessionKey.setPersonalMessageSignature(result.signature);
+                console.log("✅ Session key signed successfully");
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            },
+            onError: (error) => {
+              reject(error);
+            },
+          },
+        );
+      });
+
+      setDownloadState({
+        stage: "downloading",
+        progress: 30,
+        message: "📦 Downloading encrypted game from Walrus...",
+      });
+
+      // Download and decrypt with enhanced GameDownloadManager
       const downloadManager = new GameDownloadManager(
         suiClient,
         currentAccount.address,
+        sessionKey, // Pass session key for Seal operations
       );
+
+      console.log("🎮 DEBUG: Initiating download with game data:", {
+        id: gameData.id,
+        gameId: gameData.gameId,
+        title: gameData.title,
+        walrusBlobId: gameData.walrusBlobId,
+        isPublished: gameData.isPublished,
+      });
 
       const gameBlob = await downloadManager.downloadGame(
         gameData,
@@ -186,17 +328,32 @@ export function SecureDownloadPage() {
       setDownloadState({
         stage: "complete",
         progress: 100,
-        message: "Download complete!",
+        message: "🎉 Game downloaded and decrypted successfully!",
       });
 
       // Clear download state after success
       setTimeout(() => setDownloadState(null), 3000);
     } catch (error) {
       console.error("Secure download failed:", error);
+
+      let errorMessage = "Download failed";
+      if (error instanceof Error) {
+        if (error.message.includes("User rejected")) {
+          errorMessage =
+            "Download cancelled - signature required for secure access";
+        } else if (error.message.includes("Access denied")) {
+          errorMessage = "Access denied - NFT ownership verification failed";
+        } else if (error.message.includes("Session key")) {
+          errorMessage = "Failed to create secure session - please try again";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       setDownloadState({
         stage: "error",
         progress: 0,
-        message: error instanceof Error ? error.message : "Download failed",
+        message: errorMessage,
       });
     }
   };
