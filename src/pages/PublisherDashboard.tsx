@@ -115,11 +115,21 @@ export function PublisherDashboard() {
 
         if (gameObject.data?.content && "fields" in gameObject.data.content) {
           const fields = gameObject.data.content.fields as any;
+          
+          // Debug logging to understand the structure
+          console.log(`🔍 Game ${game.gameId} revenue_balance structure:`, fields.revenue_balance);
+          
+          // Sui Coin objects have balance field, not value field
+          const revenueBalance = fields.revenue_balance?.fields?.balance 
+            ? parseInt(fields.revenue_balance.fields.balance)
+            : 0;
+            
+          console.log(`💰 Parsed revenue balance: ${revenueBalance} MIST`);
+          
           return {
             gameId: game.gameId,
             totalSales: parseInt(fields.total_sales) || 0,
-            revenueBalance:
-              parseInt(fields.revenue_balance?.fields?.value || "0") || 0,
+            revenueBalance: revenueBalance,
             withdrawnAmount: parseInt(fields.withdrawn_amount) || 0,
             maxSupply: parseInt(fields.max_supply) || 0,
             isActive: fields.is_active === true,
