@@ -16,26 +16,26 @@
     "@mysten/walrus": "^0.6.2",
     "@mysten/walrus-wasm": "^0.1.1",
     "@radix-ui/colors": "^3.0.0",
-    "@radix-ui/react-icons": "^1.3.0",
+    "@radix-ui/react-icons": "^1.3.2",
     "@radix-ui/themes": "^3.2.1",
-    "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-query": "^5.85.3",
     "file-type": "^21.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-spinners": "^0.14.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^8.38.0",
-    "@typescript-eslint/parser": "^8.38.0",
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
     "@vitejs/plugin-react-swc": "^3.11.0",
-    "eslint": "^9.17.0",
+    "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3",
-    "vite": "^7.0.5"
+    "typescript": "^5.9.2",
+    "vite": "^5.0.0"
   },
   "packageManager": "pnpm@8.15.6+sha1.8105075ad0aa306138be128c017e9c41e28ecffa"
 }
