@@ -379,7 +379,7 @@ export function GameUpload() {
 
       console.log(`📝 Creating register transaction...`);
       const registerTx = flow.register({
-        epochs: 5, // Store for 5 epochs (~30 days)
+        epochs: 1, // Store for 1 epoch (~6 days) // for demo with limited testnet funds
         owner: currentAccount.address,
         deletable: false,
       });
