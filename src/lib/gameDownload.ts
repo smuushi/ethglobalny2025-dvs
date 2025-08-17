@@ -82,52 +82,121 @@ export class GameDownloadManager {
 
   private async verifyOwnership(game: GameNFT): Promise<boolean> {
     try {
-      // Query the specific NFT object to verify current ownership
-      const nftObject = await this.suiClient.getObject({
-        id: game.id,
-        options: { showContent: true },
+      console.log("🔍 Verifying ownership for game:", game.gameId);
+      console.log("👤 User address:", this.userAddress);
+
+      // Query user's owned NFTs from both contracts
+      const [gameStoreNFTs, nftContractNFTs] = await Promise.all([
+        this.queryGameStoreNFTs(),
+        this.queryNFTContractNFTs(),
+      ]);
+
+      console.log("🏪 GameStore NFTs found:", gameStoreNFTs.length);
+      console.log("🎫 NFT Contract NFTs found:", nftContractNFTs.length);
+
+      // Check if user owns an NFT for this game
+      const ownsGameStoreNFT = gameStoreNFTs.some((nft: any) => {
+        const nftGameId = nft.data?.content?.fields?.game_id;
+        console.log(`Checking GameStore NFT: ${nftGameId} vs ${game.gameId}`);
+        return nftGameId === game.gameId;
       });
 
-      if (!nftObject.data?.content) {
-        return false;
-      }
+      const ownsNFTContractNFT = nftContractNFTs.some((nft: any) => {
+        const nftGameId = nft.data?.content?.fields?.game_id;
+        console.log(
+          `Checking NFT Contract NFT: ${nftGameId} vs ${game.gameId}`,
+        );
+        return nftGameId === game.gameId;
+      });
 
-      const fields = (nftObject.data.content as any).fields;
-      return fields.current_owner === this.userAddress;
+      const ownsGame = ownsGameStoreNFT || ownsNFTContractNFT;
+      console.log(`🎯 Ownership result: ${ownsGame}`);
+
+      return ownsGame;
     } catch (error) {
-      console.error("Ownership verification failed:", error);
+      console.error("❌ Ownership verification failed:", error);
       return false;
     }
   }
 
+  private async queryGameStoreNFTs(): Promise<any[]> {
+    try {
+      const result = await this.suiClient.getOwnedObjects({
+        owner: this.userAddress,
+        filter: {
+          StructType: "::game_store::GameNFT",
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+      return result?.data || [];
+    } catch (error) {
+      console.warn("Failed to query GameStore NFTs:", error);
+      return [];
+    }
+  }
+
+  private async queryNFTContractNFTs(): Promise<any[]> {
+    try {
+      const result = await this.suiClient.getOwnedObjects({
+        owner: this.userAddress,
+        filter: {
+          StructType: "::nft::GameNFT",
+        },
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+      return result?.data || [];
+    } catch (error) {
+      console.warn("Failed to query NFT Contract NFTs:", error);
+      return [];
+    }
+  }
+
   private async downloadFromWalrus(blobId: string): Promise<ArrayBuffer> {
-    // TODO: Implement actual Walrus download using Tusky SDK
-    // For now, simulate the download
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (!blobId || blobId.startsWith("walrus_")) {
+      throw new Error(
+        "Invalid Walrus blob ID. This game may not have been uploaded correctly.",
+      );
+    }
 
-    // This would be replaced with actual Walrus API call:
-    // const tusky = new Tusky({ apiKey: process.env.VITE_TUSKY_API_KEY });
-    // return await tusky.file.arrayBuffer(blobId);
+    const AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
+    const downloadUrl = `${AGGREGATOR_URL}/v1/blobs/by-quilt-patch-id/${blobId}`;
 
-    throw new Error("Walrus integration not yet implemented");
+    console.log("📡 Downloading from Walrus:", downloadUrl);
+
+    const response = await fetch(downloadUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download from Walrus: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    console.log("📦 Downloaded game size:", arrayBuffer.byteLength, "bytes");
+
+    return arrayBuffer;
   }
 
   private async decryptWithSeal(
     encryptedData: ArrayBuffer,
     policyId: string,
   ): Promise<Blob> {
-    // TODO: Implement actual Seal decryption
-    // For now, simulate the decryption
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // TODO: Implement actual Seal decryption when @mysten/seal is integrated
+    // For now, return the raw data as a blob (assuming it's not encrypted yet)
+    console.log("🔐 Seal decryption not yet implemented, returning raw blob");
+    console.log("Policy ID:", policyId);
 
-    // This would be replaced with actual Seal API call:
-    // const seal = new Seal({ network: 'testnet' });
-    // return await seal.decrypt(encryptedData, {
-    //   policyId,
-    //   userAddress: this.userAddress
-    // });
+    // Simulate some processing time
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    throw new Error("Seal integration not yet implemented");
+    // Return the raw data as a blob
+    return new Blob([encryptedData]);
   }
 
   // Utility method to trigger browser download

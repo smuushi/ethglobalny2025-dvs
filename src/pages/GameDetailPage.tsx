@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useSuiClientQuery, useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useSuiClientQuery,
+  useCurrentAccount,
+  useSuiClient,
+} from "@mysten/dapp-kit";
 import {
   Box,
   Card,
@@ -16,6 +20,7 @@ import {
 } from "@radix-ui/themes";
 import { useNetworkVariable } from "../networkConfig";
 import { iglooTheme, iglooStyles } from "../theme";
+import { GameDownloadManager } from "../lib/gameDownload";
 
 interface Game {
   id: string;
@@ -226,7 +231,14 @@ function PurchaseModal({ game, isOpen, onClose }: PurchaseModalProps) {
 export function GameDetailPage() {
   const { gameId } = useParams<{ gameId: string }>();
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{
+    stage: string;
+    progress: number;
+    message: string;
+  } | null>(null);
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
 
   // Mock ownership check - in real app, this would query user's NFTs
@@ -302,6 +314,73 @@ export function GameDetailPage() {
 
   const getWalrusImageUrl = (blobId: string) => {
     return `https://aggregator.walrus-testnet.walrus.space/v1/blobs/by-quilt-patch-id/${blobId}`;
+  };
+
+  const handleDownloadGame = async () => {
+    if (!currentAccount?.address || !gameData?.data) return;
+
+    setIsDownloading(true);
+    setDownloadProgress(null);
+
+    try {
+      const downloadManager = new GameDownloadManager(
+        suiClient,
+        currentAccount.address,
+      );
+
+      // Convert game data to the format expected by GameDownloadManager
+      const gameNFT = {
+        id: game.id,
+        gameId: game.id,
+        title: game.title,
+        walrusBlobId: game.walrus_blob_id,
+        sealPolicyId: game.cover_image_blob_id, // Placeholder - actual seal policy would be different
+        currentOwner: currentAccount.address,
+      };
+
+      const gameBlob = await downloadManager.downloadGame(
+        gameNFT,
+        (progress) => {
+          setDownloadProgress({
+            stage: progress.stage,
+            progress: progress.progress,
+            message: progress.message,
+          });
+        },
+      );
+
+      // Trigger browser download
+      const filename = game.title
+        ? `${game.title.replace(/[^a-zA-Z0-9]/g, "_")}.zip`
+        : "game.zip";
+
+      GameDownloadManager.triggerDownload(gameBlob, filename);
+
+      // Show success message
+      alert(
+        `🎮 ${game.title} downloaded successfully!\n\nFile: ${filename}\n\nYour game has been saved to your Downloads folder.`,
+      );
+    } catch (error) {
+      console.error("Download failed:", error);
+
+      // Show specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes("do not own this game")) {
+          alert(
+            `❌ Access Denied\n\nYou need to own the NFT for "${game.title}" to download it.\n\nPurchase the game first, then try downloading again.`,
+          );
+        } else {
+          alert(
+            `❌ Download Error\n\n${error.message}\n\nPlease try again or contact support if the problem persists.`,
+          );
+        }
+      } else {
+        alert("Download failed. Please try again.");
+      }
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
+    }
   };
 
   return (
@@ -439,9 +518,40 @@ export function GameDetailPage() {
                       ...iglooStyles.button.primary,
                       marginBottom: "12px",
                     }}
+                    disabled={isDownloading}
+                    onClick={handleDownloadGame}
                   >
-                    ⬇️ Download Game
+                    {isDownloading ? "⏳ Downloading..." : "⬇️ Download Game"}
                   </Button>
+                  {downloadProgress && (
+                    <Box mb="2" style={{ textAlign: "center" }}>
+                      <Text
+                        size="1"
+                        style={{ color: iglooTheme.colors.primary[600] }}
+                      >
+                        {downloadProgress.message}
+                      </Text>
+                      <Box
+                        style={{
+                          width: "100%",
+                          height: "4px",
+                          background: iglooTheme.colors.ice[200],
+                          borderRadius: "2px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        <Box
+                          style={{
+                            width: `${downloadProgress.progress}%`,
+                            height: "100%",
+                            background: iglooTheme.colors.primary[500],
+                            borderRadius: "2px",
+                            transition: "width 0.3s ease",
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  )}
                   <Text size="2" color="gray" style={{ textAlign: "center" }}>
                     You own this game
                   </Text>

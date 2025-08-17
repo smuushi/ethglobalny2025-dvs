@@ -186,7 +186,7 @@ export function LibraryPage() {
         currentAccount.address,
       );
 
-      await downloadManager.downloadGame(game, (progress) => {
+      const gameBlob = await downloadManager.downloadGame(game, (progress) => {
         setDownloadState({
           gameId: game.id,
           stage: progress.stage,
@@ -195,19 +195,41 @@ export function LibraryPage() {
         });
       });
 
-      // If we get here, download was successful (but Walrus/Seal not implemented yet)
+      // Trigger browser download
+      const filename = game.title
+        ? `${game.title.replace(/[^a-zA-Z0-9]/g, "_")}.zip`
+        : "game.zip";
+
+      GameDownloadManager.triggerDownload(gameBlob, filename);
+
+      // Show success message
+      alert(
+        `🎮 ${game.title} downloaded successfully!\n\nFile: ${filename}\n\nYour game has been saved to your Downloads folder.`,
+      );
+
       setDownloadState(null);
     } catch (error) {
       console.error("Download failed:", error);
 
-      // Show user-friendly message for unimplemented features
-      if (
-        error instanceof Error &&
-        error.message.includes("not yet implemented")
-      ) {
-        alert(
-          `Download functionality coming soon!\n\nGame: ${game.title}\nWalrus Blob: ${game.walrusBlobId}\nSeal Policy: ${game.sealPolicyId}\n\nOnce Walrus and Seal are integrated, you'll be able to download your games directly!`,
-        );
+      // Show specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes("do not own this game")) {
+          alert(
+            `❌ Access Denied\n\nYou need to own the NFT for "${game.title}" to download it.\n\nPurchase the game first, then try downloading again.`,
+          );
+        } else if (error.message.includes("Invalid Walrus blob ID")) {
+          alert(
+            `⚠️ Download Unavailable\n\nThe game file for "${game.title}" is not available for download.\n\nThis may be because:\n• The file wasn't uploaded correctly\n• The Walrus blob ID is invalid\n\nContact the game publisher for support.`,
+          );
+        } else if (error.message.includes("Failed to download from Walrus")) {
+          alert(
+            `📡 Download Failed\n\nCouldn't download "${game.title}" from Walrus storage.\n\nPlease check your internet connection and try again.`,
+          );
+        } else {
+          alert(
+            `❌ Download Error\n\n${error.message}\n\nPlease try again or contact support if the problem persists.`,
+          );
+        }
       } else {
         alert("Download failed. Please try again.");
       }
@@ -331,7 +353,7 @@ export function LibraryPage() {
                       <Badge size="1" color="cyan">
                         {game.genre}
                       </Badge>
-                      {"isPublished" in game && game.isPublished && (
+                      {"isPublished" in game && (game as any).isPublished && (
                         <Badge size="1" color="orange">
                           Creator
                         </Badge>
@@ -358,7 +380,7 @@ export function LibraryPage() {
                   style={{
                     background: iglooTheme.gradients.iceBlue,
                     padding: "12px",
-                    borderRadius: iglooTheme.borderRadius.snowball,
+                    borderRadius: iglooTheme.borderRadius.arch,
                     marginBottom: "16px",
                   }}
                 >
@@ -367,7 +389,7 @@ export function LibraryPage() {
                       size="1"
                       style={{ color: iglooTheme.colors.ice[600] }}
                     >
-                      {"isPublished" in game && game.isPublished
+                      {"isPublished" in game && (game as any).isPublished
                         ? "Published"
                         : "Purchased"}
                     </Text>
@@ -378,7 +400,7 @@ export function LibraryPage() {
                       {formatDate(game.mintDate)}
                     </Text>
                   </Flex>
-                  {!("isPublished" in game && game.isPublished) ? (
+                  {!("isPublished" in game && (game as any).isPublished) ? (
                     <Flex justify="between">
                       <Text
                         size="1"
@@ -435,9 +457,9 @@ export function LibraryPage() {
                       size="3"
                       style={{
                         width: "100%",
-                        background: iglooTheme.gradients.primary,
+                        background: iglooTheme.gradients.coolBlue,
                         border: "none",
-                        borderRadius: iglooTheme.borderRadius.snowball,
+                        borderRadius: iglooTheme.borderRadius.arch,
                         fontWeight: "600",
                       }}
                       onClick={() => handleDownloadGame(game)}
@@ -452,7 +474,7 @@ export function LibraryPage() {
                   <Text size="1" style={{ color: iglooTheme.colors.ice[500] }}>
                     NFT ID: {game.id.substring(0, 8)}...
                   </Text>
-                  {"isPublished" in game && game.isPublished && (
+                  {"isPublished" in game && (game as any).isPublished && (
                     <>
                       <Text
                         size="1"
