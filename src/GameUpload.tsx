@@ -291,10 +291,6 @@ export function GameUpload() {
         );
       });
 
-      // Wait 25 seconds to ensure all files are fully processed
-      console.log(`⏳ Waiting 25 seconds for file processing to complete...`);
-      await new Promise((resolve) => setTimeout(resolve, 25000));
-
       // Get the final blob ID
       const files = await flow.listFiles();
       if (files.length === 0) {
@@ -460,7 +456,7 @@ export function GameUpload() {
       });
 
       tx.moveCall({
-        target: `${gameStorePackageId}::game_store::publish_game`,
+        target: `${gameStorePackageId}::game_store::publish_game_entry`,
         arguments: [
           tx.object(gameStoreObjectId), // GameStore shared object ID
           tx.pure.vector(
@@ -579,30 +575,30 @@ export function GameUpload() {
     metadata.price;
 
   return (
-    <Card 
-      size="3" 
-      style={{ 
+    <Card
+      size="3"
+      style={{
         ...iglooStyles.card,
-        maxWidth: "600px", 
+        maxWidth: "600px",
         margin: "0 auto",
-        background: iglooTheme.gradients.frostWhite
+        background: iglooTheme.gradients.frostWhite,
       }}
     >
       <Flex direction="column" gap="4">
         <Flex align="center" gap="3">
           <Box
             style={{
-              fontSize: '2rem',
-              filter: 'drop-shadow(0 2px 4px rgba(14, 165, 233, 0.3))'
+              fontSize: "2rem",
+              filter: "drop-shadow(0 2px 4px rgba(14, 165, 233, 0.3))",
             }}
           >
             📤
           </Box>
-          <Heading 
+          <Heading
             size="6"
-            style={{ 
+            style={{
               color: iglooTheme.colors.primary[700],
-              textShadow: '0 1px 2px rgba(14, 165, 233, 0.1)'
+              textShadow: "0 1px 2px rgba(14, 165, 233, 0.1)",
             }}
           >
             Publish Your Game
@@ -790,8 +786,8 @@ export function GameUpload() {
           }
           style={{
             ...iglooStyles.button.primary,
-            width: '100%',
-            marginTop: '16px'
+            width: "100%",
+            marginTop: "16px",
           }}
         >
           {uploadProgress.isUploading || isTransactionPending ? (

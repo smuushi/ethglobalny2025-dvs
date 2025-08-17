@@ -2,13 +2,21 @@ export const DEVNET_COUNTER_PACKAGE_ID = "0xTODO";
 export const TESTNET_COUNTER_PACKAGE_ID =
   "0x1d9bb93abc33d0848e430fa6e2b2d5e5d9f85a00f7b2becccf13267153b7ca91";
 export const MAINNET_COUNTER_PACKAGE_ID = "0xTODO";
+
+// NFT Package IDs for ColdCache Game NFTs
+export const DEVNET_NFT_PACKAGE_ID = "0xTODO";
+export const TESTNET_NFT_PACKAGE_ID =
+  "0x269789a9a66ea57fda7bcb252d355721369c2c8f51dc2f25241e8c279d7741c9";
+export const MAINNET_NFT_PACKAGE_ID = "0xTODO";
+
+// Game Store Package IDs (FIXED VERSION - no unused value error)
 export const DEVNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 export const TESTNET_GAME_STORE_PACKAGE_ID =
-  "0x5f962199ecb202c345fafa5ca2f5e822b3c8d5618fbc38fdbb27321c0929fa23";
+  "0xbe49bf3340674270b149f80ce0ca6db9c7319c727352d26b1fd8a57c63a9692e";
 export const MAINNET_GAME_STORE_PACKAGE_ID = "0xTODO";
 
-// GameStore shared object IDs
+// GameStore shared object IDs (FIXED VERSION)
 export const DEVNET_GAME_STORE_OBJECT_ID = "0xTODO";
 export const TESTNET_GAME_STORE_OBJECT_ID =
-  "0xdd05df0a83a3ae4250e71ee301d200c21cab00ef3000a7c2e9df36675ff24fd5";
+  "0x57ad1d1019611522559496bf2d0d3dcb68bfdb9f368f5472e0442c45d0436026";
 export const MAINNET_GAME_STORE_OBJECT_ID = "0xTODO";

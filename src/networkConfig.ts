@@ -9,6 +9,9 @@ import {
   DEVNET_GAME_STORE_OBJECT_ID,
   TESTNET_GAME_STORE_OBJECT_ID,
   MAINNET_GAME_STORE_OBJECT_ID,
+  DEVNET_NFT_PACKAGE_ID,
+  TESTNET_NFT_PACKAGE_ID,
+  MAINNET_NFT_PACKAGE_ID,
 } from "./constants.ts";
 import { createNetworkConfig } from "@mysten/dapp-kit";
 
@@ -20,6 +23,7 @@ const { networkConfig, useNetworkVariable, useNetworkVariables } =
         counterPackageId: DEVNET_COUNTER_PACKAGE_ID,
         gameStorePackageId: DEVNET_GAME_STORE_PACKAGE_ID,
         gameStoreObjectId: DEVNET_GAME_STORE_OBJECT_ID,
+        nftPackageId: DEVNET_NFT_PACKAGE_ID,
       },
     },
     testnet: {
@@ -28,6 +32,7 @@ const { networkConfig, useNetworkVariable, useNetworkVariables } =
         counterPackageId: TESTNET_COUNTER_PACKAGE_ID,
         gameStorePackageId: TESTNET_GAME_STORE_PACKAGE_ID,
         gameStoreObjectId: TESTNET_GAME_STORE_OBJECT_ID,
+        nftPackageId: TESTNET_NFT_PACKAGE_ID,
       },
     },
     mainnet: {
@@ -36,6 +41,7 @@ const { networkConfig, useNetworkVariable, useNetworkVariables } =
         counterPackageId: MAINNET_COUNTER_PACKAGE_ID,
         gameStorePackageId: MAINNET_GAME_STORE_PACKAGE_ID,
         gameStoreObjectId: MAINNET_GAME_STORE_OBJECT_ID,
+        nftPackageId: MAINNET_NFT_PACKAGE_ID,
       },
     },
   });

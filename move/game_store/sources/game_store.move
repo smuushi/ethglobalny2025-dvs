@@ -66,6 +66,13 @@ module game_store::game_store {
         nft_id: ID,
     }
 
+    public struct PublisherNFTMinted has copy, drop {
+        game_id: ID,
+        publisher: address,
+        nft_id: ID,
+        title: String,
+    }
+
     fun init(ctx: &mut TxContext) {
         let store = GameStore {
             id: object::new(ctx),
@@ -86,6 +93,45 @@ module game_store::game_store {
         transfer::share_object(store);
     }
 
+    public entry fun publish_game_entry(
+        store: &mut GameStore,
+        title: vector<u8>,
+        description: vector<u8>,
+        price: u64,
+        walrus_blob_id: vector<u8>,
+        cover_image_blob_id: vector<u8>,
+        genre: vector<u8>,
+        // Game file metadata
+        game_filename: vector<u8>,
+        game_file_size: u64,
+        game_content_type: vector<u8>,
+        // Cover image metadata
+        cover_filename: vector<u8>,
+        cover_file_size: u64,
+        cover_content_type: vector<u8>,
+        ctx: &mut TxContext
+    ) {
+        let (_game_id, publisher_nft) = publish_game(
+            store,
+            title,
+            description,
+            price,
+            walrus_blob_id,
+            cover_image_blob_id,
+            genre,
+            game_filename,
+            game_file_size,
+            game_content_type,
+            cover_filename,
+            cover_file_size,
+            cover_content_type,
+            ctx
+        );
+        
+        // Transfer the NFT to the publisher
+        transfer::public_transfer(publisher_nft, tx_context::sender(ctx));
+    }
+
     public fun publish_game(
         store: &mut GameStore,
         title: vector<u8>,
@@ -103,7 +149,7 @@ module game_store::game_store {
         cover_file_size: u64,
         cover_content_type: vector<u8>,
         ctx: &mut TxContext
-    ): ID {
+    ): (ID, GameNFT) {
         let game_metadata = GameFileMetadata {
             original_filename: string::utf8(game_filename),
             file_size: game_file_size,
@@ -138,6 +184,16 @@ module game_store::game_store {
         vector::push_back(&mut store.games, game_id);
         store.total_games = store.total_games + 1;
 
+        // Mint NFT for the publisher
+        let publisher_nft = GameNFT {
+            id: object::new(ctx),
+            game_id,
+            owner: tx_context::sender(ctx),
+            purchase_date: tx_context::epoch(ctx),
+        };
+
+        let nft_id = object::id(&publisher_nft);
+
         event::emit(GamePublished {
             game_id,
             title: game.title,
@@ -146,8 +202,15 @@ module game_store::game_store {
             walrus_blob_id: game.walrus_blob_id,
         });
 
+        event::emit(PublisherNFTMinted {
+            game_id,
+            publisher: game.publisher,
+            nft_id,
+            title: game.title,
+        });
+
         transfer::share_object(game);
-        game_id
+        (game_id, publisher_nft)
     }
 
     public fun purchase_game(

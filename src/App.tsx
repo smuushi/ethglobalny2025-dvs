@@ -1,4 +1,4 @@
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useCurrentAccount, ConnectButton } from "@mysten/dapp-kit";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Box, Flex, Heading } from "@radix-ui/themes";
 import { Layout } from "./components/Layout";
@@ -90,10 +90,21 @@ function App() {
                 style={{
                   color: iglooTheme.colors.ice[600],
                   fontSize: "14px",
+                  marginBottom: "24px",
                 }}
               >
                 Connect your Sui wallet to explore games, manage your library,
                 and publish your own creations
+              </Box>
+
+              <Box
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  marginTop: "16px",
+                }}
+              >
+                <ConnectButton />
               </Box>
             </Box>
           </Box>
