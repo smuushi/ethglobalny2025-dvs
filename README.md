@@ -2,7 +2,10 @@
 
 **Decentralized Game Distribution Platform on Sui + Walrus**
 
-ColdCache is a revolutionary gaming platform that combines blockchain technology with decentralized storage to create a secure, transparent, and user-owned gaming ecosystem. Built on Sui blockchain with Walrus decentralized storage and Seal encryption.
+ColdCache is a revolutionary gaming platform that combines blockchain technology
+with decentralized storage to create a secure, transparent, and user-owned
+gaming ecosystem. Built on Sui blockchain with Walrus decentralized storage and
+Seal encryption.
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-coldcache.xyz-blue?style=for-the-badge)](https://www.coldcache.xyz)
 [![Sui Network](https://img.shields.io/badge/⛓️_Blockchain-Sui_Testnet-red?style=for-the-badge)](https://sui.io)
@@ -13,6 +16,7 @@ ColdCache is a revolutionary gaming platform that combines blockchain technology
 ## 🎯 **What is ColdCache?**
 
 ColdCache revolutionizes game distribution by:
+
 - **🔐 Encrypting games** with Seal technology tied to NFT ownership
 - **☁️ Storing games** on decentralized Walrus network (no central servers)
 - **💎 Creating NFT ownership** that grants access to encrypted games
@@ -20,6 +24,7 @@ ColdCache revolutionizes game distribution by:
 - **🌐 Providing global access** via decentralized CDN
 
 ### **Core Features**
+
 - 🎮 **Game Store** - Browse and purchase games with SUI cryptocurrency
 - 📚 **Personal Library** - Access your owned games with NFT verification
 - 📤 **Publisher Tools** - Upload and monetize your games directly
@@ -39,19 +44,19 @@ graph TB
         C["📚 Library<br/>Owned Games"]
         D["💰 Publisher Dashboard<br/>Analytics & Revenue"]
     end
-    
+
     subgraph "Blockchain Layer (Sui)"
         E["🏪 Game Store Contract<br/>NFT Marketplace"]
         F["🎯 NFT Contract<br/>Game Ownership"]
         G["💎 Revenue Management<br/>Publisher Earnings"]
     end
-    
+
     subgraph "Storage Layer (Walrus)"
         H["☁️ Decentralized Storage<br/>Game Files & Assets"]
         I["🔐 Seal Encryption<br/>NFT-Gated Access"]
         J["🌐 CDN Access<br/>Global Distribution"]
     end
-    
+
     A --> E
     B --> E
     B --> H
@@ -74,29 +79,29 @@ graph LR
         A4["4. Mint NFT<br/>💎 Ownership Token"]
         A5["5. Store Listing<br/>🏪 Marketplace"]
     end
-    
+
     subgraph "Purchase Flow"
         B1["1. Browse Store<br/>🔍 Discover Games"]
         B2["2. Purchase Game<br/>💰 SUI Payment"]
         B3["3. Receive NFT<br/>🎯 Ownership Proof"]
         B4["4. Access Library<br/>📚 Download Games"]
     end
-    
+
     subgraph "Security Layer"
         C1["🔒 Encrypted Storage<br/>Files protected by Seal"]
         C2["🎯 NFT Ownership<br/>Blockchain verification"]
         C3["🚫 Access Control<br/>Only owners can decrypt"]
     end
-    
+
     A1 --> A2
     A2 --> A3
     A3 --> A4
     A4 --> A5
-    
+
     B1 --> B2
     B2 --> B3
     B3 --> B4
-    
+
     A2 --> C1
     A4 --> C2
     B4 --> C3
@@ -106,16 +111,21 @@ graph LR
 
 ## ⚡ **Partial Encryption System**
 
-ColdCache features an advanced **partial encryption optimization** that dramatically improves performance for large game files (≥30MB) while maintaining full NFT-gated security.
+ColdCache features an advanced **partial encryption optimization** that
+dramatically improves performance for large game files (≥30MB) while maintaining
+full NFT-gated security.
 
 ### **🔍 How Partial Encryption Works**
 
 Instead of encrypting entire large files, ColdCache intelligently:
 
-1. **🔐 Encrypts Critical Portions**: Only encrypts 5-15% of the file (critical headers and executable code)
-2. **📦 Splits Into Dual Blobs**: Creates two secure chunks - encrypted + unencrypted
+1. **🔐 Encrypts Critical Portions**: Only encrypts 5-15% of the file (critical
+   headers and executable code)
+2. **📦 Splits Into Dual Blobs**: Creates two secure chunks - encrypted +
+   unencrypted
 3. **☁️ Stores Separately**: Uploads both chunks to Walrus decentralized storage
-4. **🔧 Reconstructs On Download**: Seamlessly combines chunks into original file
+4. **🔧 Reconstructs On Download**: Seamlessly combines chunks into original
+   file
 
 ```mermaid
 graph TB
@@ -126,7 +136,7 @@ graph TB
         A4["📋 Enhanced Metadata<br/>Reconstruction info stored"]
         A5["💎 Mint NFT<br/>Links to both blobs"]
     end
-    
+
     subgraph "Download Flow - Reconstruction"
         B1["🎯 NFT Verification<br/>Ownership confirmed"]
         B2["📥 Download Chunks<br/>Parallel blob retrieval"]
@@ -134,12 +144,12 @@ graph TB
         B4["🔧 Reconstruct File<br/>Combine chunks seamlessly"]
         B5["🎮 Play Game<br/>Original 150MB file"]
     end
-    
+
     A1 --> A2
     A2 --> A3
     A3 --> A4
     A4 --> A5
-    
+
     B1 --> B2
     B2 --> B3
     B3 --> B4
@@ -150,33 +160,35 @@ graph TB
 
 The system automatically tracks and optimizes based on file size:
 
-| File Size | Encryption Strategy | Encrypted Portion | Performance Gain |
-|-----------|-------------------|------------------|------------------|
-| **< 30MB** | Full encryption | 100% | Standard speed |
-| **30MB - 500MB** | Partial encryption | **15%** | **~7x faster** |
-| **500MB - 1GB** | Partial encryption | **10%** | **~10x faster** |
-| **> 1GB** | Partial encryption | **5%** | **~20x faster** |
+| File Size        | Encryption Strategy | Encrypted Portion | Performance Gain |
+| ---------------- | ------------------- | ----------------- | ---------------- |
+| **< 30MB**       | Full encryption     | 100%              | Standard speed   |
+| **30MB - 500MB** | Partial encryption  | **15%**           | **~7x faster**   |
+| **500MB - 1GB**  | Partial encryption  | **10%**           | **~10x faster**  |
+| **> 1GB**        | Partial encryption  | **5%**            | **~20x faster**  |
 
 ### **🔧 Technical Implementation**
 
 **Enhanced Metadata Storage:**
+
 ```typescript
 interface GameEncryptionInfo {
   isPartiallyEncrypted: boolean;
   enhancedMetadata: {
     gameFile: {
-      originalSize: number;        // 157,286,400 bytes (150MB)
-      encryptedSize: number;       // ~15,728,640 bytes (15MB) 
-      unencryptedSize: number;     // ~141,557,760 bytes (135MB)
-      encryptionPercentage: "10.0" // % of file encrypted
-    }
+      originalSize: number; // 157,286,400 bytes (150MB)
+      encryptedSize: number; // ~15,728,640 bytes (15MB)
+      unencryptedSize: number; // ~141,557,760 bytes (135MB)
+      encryptionPercentage: "10.0"; // % of file encrypted
+    };
   };
-  secondaryBlobId: string;         // Walrus ID for unencrypted chunk
-  sealEncryptionId: string;        // Seal encryption identifier
+  secondaryBlobId: string; // Walrus ID for unencrypted chunk
+  sealEncryptionId: string; // Seal encryption identifier
 }
 ```
 
 **Smart Contract Fields:**
+
 ```move
 public struct Game has key, store {
     // ... existing fields
@@ -202,6 +214,7 @@ Using your uploaded game as an example:
 ```
 
 **Optimization Applied:**
+
 - **Original size**: 150MB
 - **Encrypted portion**: ~15MB (10% - critical executable headers)
 - **Unencrypted portion**: ~135MB (90% - game assets/data)
@@ -211,17 +224,20 @@ Using your uploaded game as an example:
 ### **📈 Performance Benefits**
 
 **Upload Performance:**
+
 - **Encryption Speed**: 10-20x faster (only encrypts critical portions)
 - **Parallel Upload**: Both chunks can upload simultaneously
 - **Bandwidth Efficiency**: Unencrypted chunk uploads at full CDN speed
 
 **Download Performance:**
-- **Parallel Download**: Both chunks download simultaneously  
+
+- **Parallel Download**: Both chunks download simultaneously
 - **Faster Decryption**: Only small encrypted portion needs Seal processing
 - **Better UX**: More granular progress tracking with reconstruction stage
 - **Lower Gas Costs**: Simplified ownership verification
 
 **Storage Efficiency:**
+
 - **Deduplication**: Common game assets can be shared across versions
 - **CDN Optimization**: Unencrypted chunks benefit from CDN caching
 - **Bandwidth Savings**: Faster transfers reduce network costs
@@ -232,7 +248,8 @@ Despite optimization, security remains uncompromised:
 
 - **🎯 NFT Gating**: Both chunks require NFT ownership to access
 - **🔐 Critical Protection**: Executable code and headers are fully encrypted
-- **🚫 Partial Access**: Unencrypted chunk alone is useless without encrypted portion
+- **🚫 Partial Access**: Unencrypted chunk alone is useless without encrypted
+  portion
 - **🛡️ Blockchain Verification**: All access attempts verified on-chain
 
 ### **🚀 Smart Detection Logic**
@@ -247,19 +264,20 @@ if (usePartialEncryption) {
   console.log("🚀 Using PARTIAL encryption for performance optimization");
   // Split file, encrypt critical portion, upload dual blobs
 } else {
-  console.log("🔒 Using FULL encryption for maximum security");  
+  console.log("🔒 Using FULL encryption for maximum security");
   // Traditional single-blob full encryption
 }
 ```
 
 **UI Indicators:**
+
 ```typescript
 // Shows during upload for files ≥30MB
-"⚡ Large file: Will use PARTIAL encryption for fast upload (~10% encrypted)"
+"⚡ Large file: Will use PARTIAL encryption for fast upload (~10% encrypted)";
 
 // Shows during download
-"🔐 Game uses PARTIAL encryption - downloading dual blobs"
-"🔧 Reconstructing original file..." // New reconstruction stage
+"🔐 Game uses PARTIAL encryption - downloading dual blobs";
+"🔧 Reconstructing original file..."; // New reconstruction stage
 ```
 
 ### **🔍 Monitoring & Analytics**
@@ -276,22 +294,24 @@ Track your partial encryption performance in real-time:
   estimatedEncryptionTime: '~3 seconds'
 }"
 
-// Console logs during download show reconstruction details  
+// Console logs during download show reconstruction details
 "🔧 Reconstructing file: {
   decryptedChunkSize: 15728640,
-  unencryptedChunkSize: 141557760,  
+  unencryptedChunkSize: 141557760,
   totalReconstructedSize: 157286400,
   mimeType: 'application/zip'
 }"
 ```
 
 **Publisher Dashboard Metrics:**
+
 - Upload time reduction (shown vs traditional encryption)
 - Download success rates and average times
 - File reconstruction completion rates
 - User experience improvements measured
 
-This partial encryption system makes ColdCache the most performant decentralized game distribution platform while maintaining enterprise-grade security! 🎮✨
+This partial encryption system makes ColdCache the most performant decentralized
+game distribution platform while maintaining enterprise-grade security! 🎮✨
 
 ---
 
@@ -306,41 +326,41 @@ graph TD
         D["⚡ Vite<br/>Build Tool"]
         E["🎯 Custom Theme<br/>Igloo Design System"]
     end
-    
+
     subgraph "Blockchain Integration"
         F["🏛️ Sui Blockchain<br/>Smart Contracts"]
         G["🔗 @mysten/dapp-kit<br/>Wallet Integration"]
         H["💎 @mysten/sui<br/>Blockchain SDK"]
         I["🔐 @mysten/seal<br/>Encryption Service"]
     end
-    
+
     subgraph "Storage & CDN"
         J["☁️ Walrus Network<br/>Decentralized Storage"]
         K["📦 @mysten/walrus<br/>Storage SDK"]
         L["🌐 Aggregator CDN<br/>Global Distribution"]
     end
-    
+
     subgraph "Deployment"
         M["▲ Vercel<br/>Frontend Hosting"]
         N["🎯 Custom Domain<br/>coldcache.xyz"]
         O["🔒 HTTPS/SSL<br/>Secure Connections"]
     end
-    
+
     A --> B
     B --> C
     C --> D
     D --> E
-    
+
     F --> G
     G --> H
     H --> I
-    
+
     J --> K
     K --> L
-    
+
     M --> N
     N --> O
-    
+
     A -.-> G
     C -.-> K
     E -.-> M
@@ -348,38 +368,42 @@ graph TD
 
 ### **Key Technologies**
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Frontend** | React 18 + TypeScript | Modern, type-safe UI |
-| **Styling** | Radix UI + Custom Theme | Beautiful, accessible components |
-| **Blockchain** | Sui Network | Fast, low-cost smart contracts |
-| **Storage** | Walrus Network | Decentralized file storage |
-| **Encryption** | Mysten Seal | NFT-gated access control |
-| **Wallet** | Sui Wallet Kit | Secure wallet integration |
-| **Deployment** | Vercel | Global CDN deployment |
+| Component      | Technology              | Purpose                          |
+| -------------- | ----------------------- | -------------------------------- |
+| **Frontend**   | React 18 + TypeScript   | Modern, type-safe UI             |
+| **Styling**    | Radix UI + Custom Theme | Beautiful, accessible components |
+| **Blockchain** | Sui Network             | Fast, low-cost smart contracts   |
+| **Storage**    | Walrus Network          | Decentralized file storage       |
+| **Encryption** | Mysten Seal             | NFT-gated access control         |
+| **Wallet**     | Sui Wallet Kit          | Secure wallet integration        |
+| **Deployment** | Vercel                  | Global CDN deployment            |
 
 ---
 
 ## 🚀 **Quick Start**
 
 ### **Prerequisites**
-- Node.js 18+ 
+
+- Node.js 18+
 - pnpm package manager
 - Sui Wallet browser extension
 - Git
 
 ### **1. Clone Repository**
+
 ```bash
 git clone https://github.com/smuushi/ethglobalny2025-dvs.git
 cd ethglobalny2025-dvs
 ```
 
 ### **2. Install Dependencies**
+
 ```bash
 pnpm install
 ```
 
 ### **3. Set Up Sui Environment**
+
 ```bash
 # Install Sui CLI (if not already installed)
 curl -fLJO https://github.com/MystenLabs/sui/releases/latest/download/sui-mainnet-v1.0.0-ubuntu-x86_64.tgz
@@ -404,7 +428,7 @@ If you want to deploy your own contracts instead of using the existing ones:
 cd move/game_store
 sui client publish --gas-budget 100000000
 
-# Deploy NFT contract  
+# Deploy NFT contract
 cd ../nft
 sui client publish --gas-budget 100000000
 
@@ -412,6 +436,7 @@ sui client publish --gas-budget 100000000
 ```
 
 ### **5. Start Development Server**
+
 ```bash
 pnpm dev
 ```
@@ -427,6 +452,7 @@ Visit `http://localhost:5173` to see ColdCache running locally! 🎉
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/smuushi/ethglobalny2025-dvs)
 
 **Manual Deployment:**
+
 ```bash
 # Install Vercel CLI
 npm i -g vercel
@@ -437,10 +463,12 @@ vercel --prod
 ```
 
 **Environment Variables** (optional):
+
 - `VITE_NETWORK` - Network to use (`testnet` | `mainnet`)
 - `VITE_SUI_RPC_URL` - Custom Sui RPC endpoint
 
 ### **Custom Domain Setup**
+
 1. **Add domain** in Vercel dashboard
 2. **Configure DNS** to point to Vercel
 3. **SSL certificate** automatically provisioned
@@ -497,6 +525,7 @@ vercel --prod
 ## 🛠️ **Development**
 
 ### **Project Structure**
+
 ```
 ColdCache/
 ├── src/
@@ -515,22 +544,22 @@ ColdCache/
 
 ### **Key Components**
 
-| File | Purpose |
-|------|---------|
-| `src/pages/HomePage.tsx` | Landing page and game discovery |
-| `src/pages/StorePage.tsx` | Game marketplace and purchasing |
-| `src/pages/LibraryPage.tsx` | Owned games and secure downloads |
-| `src/pages/PublisherDashboard.tsx` | Publisher analytics and revenue |
-| `src/GameUpload.tsx` | Game publishing and upload flow |
-| `src/lib/seal.ts` | Seal encryption integration |
-| `src/lib/walrus.ts` | Walrus storage configuration |
+| File                               | Purpose                          |
+| ---------------------------------- | -------------------------------- |
+| `src/pages/HomePage.tsx`           | Landing page and game discovery  |
+| `src/pages/StorePage.tsx`          | Game marketplace and purchasing  |
+| `src/pages/LibraryPage.tsx`        | Owned games and secure downloads |
+| `src/pages/PublisherDashboard.tsx` | Publisher analytics and revenue  |
+| `src/GameUpload.tsx`               | Game publishing and upload flow  |
+| `src/lib/seal.ts`                  | Seal encryption integration      |
+| `src/lib/walrus.ts`                | Walrus storage configuration     |
 
 ### **Smart Contracts**
 
-| Contract | Purpose | Location |
-|----------|---------|----------|
+| Contract      | Purpose                     | Location           |
+| ------------- | --------------------------- | ------------------ |
 | **GameStore** | Marketplace, sales, revenue | `move/game_store/` |
-| **NFT** | Game ownership tokens | `move/nft/` |
+| **NFT**       | Game ownership tokens       | `move/nft/`        |
 
 ### **Development Commands**
 
@@ -554,23 +583,26 @@ cd move/nft && sui client publish --gas-budget 100000000
 ## 🔧 **Configuration**
 
 ### **Network Configuration**
+
 Edit `src/constants.ts` to configure your deployment:
 
 ```typescript
 // Game Store Package IDs
 export const TESTNET_GAME_STORE_PACKAGE_ID = "0x1708e..."; // Your package ID
-export const TESTNET_GAME_STORE_OBJECT_ID = "0x43e2d...";  // Your store object ID
+export const TESTNET_GAME_STORE_OBJECT_ID = "0x43e2d..."; // Your store object ID
 
-// NFT Package IDs  
-export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // Your NFT package ID
+// NFT Package IDs
+export const TESTNET_NFT_PACKAGE_ID = "0x4192d..."; // Your NFT package ID
 ```
 
 ### **Wallet Integration**
+
 - **Supported Wallets**: Sui Wallet, Suiet, Martian, Ethos
 - **Network**: Sui Testnet (configurable for Mainnet)
 - **Currency**: SUI tokens for all transactions
 
 ### **File Limits**
+
 - **Maximum file size**: 13.3 GiB (Walrus network limit)
 - **Supported formats**: ZIP, RAR, 7Z, TAR, EXE, DMG
 - **Image formats**: JPG, PNG, GIF, WebP
@@ -580,18 +612,21 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // Your NFT package I
 ## 🔒 **Security Features**
 
 ### **Encryption & Access Control**
+
 - **🔐 Seal Encryption**: Games encrypted with NFT-tied keys
 - **🎯 Ownership Verification**: Blockchain-based access control
 - **🚫 Piracy Prevention**: Direct CDN access blocked for encrypted files
 - **💎 NFT Ownership**: Immutable proof of game ownership
 
 ### **Smart Contract Security**
+
 - **👤 Publisher Controls**: Only publishers can modify their games
 - **💰 Revenue Protection**: Automatic revenue distribution and withdrawal
 - **🛡️ Access Validation**: Multi-layer ownership verification
 - **⚡ Gas Optimization**: Efficient contract design
 
 ### **Storage Security**
+
 - **🌐 Decentralized**: No single point of failure
 - **🔄 Redundancy**: Multiple storage nodes ensure availability
 - **🔐 Content Addressing**: Immutable file references
@@ -602,12 +637,14 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // Your NFT package I
 ## 📦 **Smart Contract Deployment**
 
 ### **Deploy Game Store Contract**
+
 ```bash
 cd move/game_store
 sui client publish --gas-budget 100000000
 ```
 
 **Expected Output:**
+
 ```bash
 Successfully published package: 0x1708e46c71fc5805fbd6f04339bd04bc0566b85a73fd687d0481d686c127c5f6
 
@@ -616,17 +653,20 @@ Created Objects:
 ```
 
 ### **Deploy NFT Contract**
+
 ```bash
-cd move/nft  
+cd move/nft
 sui client publish --gas-budget 100000000
 ```
 
 ### **Update Configuration**
+
 Add the package IDs to `src/constants.ts`:
+
 ```typescript
 export const TESTNET_GAME_STORE_PACKAGE_ID = "0x1708e..."; // Your package ID
-export const TESTNET_GAME_STORE_OBJECT_ID = "0x43e2d...";  // GameStore object ID
-export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
+export const TESTNET_GAME_STORE_OBJECT_ID = "0x43e2d..."; // GameStore object ID
+export const TESTNET_NFT_PACKAGE_ID = "0x4192d..."; // NFT package ID
 ```
 
 ---
@@ -634,11 +674,13 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ## 🎮 **Game Upload Requirements**
 
 ### **Supported File Types**
+
 - **Archives**: ZIP, RAR, 7Z, TAR
 - **Executables**: EXE (Windows), DMG (macOS)
 - **Maximum Size**: 13.3 GiB per file
 
 ### **Game Metadata**
+
 - **Title**: Game name (required)
 - **Description**: Game description (required)
 - **Price**: Price in SUI tokens (required)
@@ -646,6 +688,7 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 - **Cover Image**: JPG/PNG thumbnail (optional)
 
 ### **Upload Process**
+
 1. **Encryption**: Game files encrypted with Seal
 2. **Storage**: Files uploaded to Walrus network
 3. **NFT Minting**: Publisher NFT created for management
@@ -656,24 +699,28 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ## 🌟 **Features**
 
 ### **🛒 Game Store**
+
 - Browse available games with filters
 - View game details, screenshots, and metadata
 - Purchase games with SUI cryptocurrency
 - Automatic NFT minting on purchase
 
 ### **📚 Personal Library**
+
 - View all owned game NFTs
 - Secure download with ownership verification
 - Game file decryption for NFT owners only
 - Transfer games to other wallets
 
 ### **📊 Publisher Dashboard**
+
 - Upload and publish new games
 - Track sales and revenue analytics
 - Withdraw earnings to wallet
 - Manage game pricing and availability
 
 ### **🔐 Security System**
+
 - Seal encryption prevents unauthorized access
 - NFT ownership controls file decryption
 - Secure download URLs with verification
@@ -686,6 +733,7 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ### **Common Issues**
 
 **Wallet Connection Problems**
+
 ```bash
 # Clear browser cache and cookies
 # Reinstall Sui Wallet extension
@@ -693,6 +741,7 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ```
 
 **File Upload Failures**
+
 ```bash
 # Check file size (max 13.3 GiB)
 # Verify wallet has sufficient SUI for gas
@@ -701,6 +750,7 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ```
 
 **Transaction Failures**
+
 ```bash
 # Ensure wallet is funded with SUI
 # Check gas budget settings
@@ -709,6 +759,7 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ```
 
 **Download Issues**
+
 ```bash
 # Verify NFT ownership in wallet
 # Check browser console for errors
@@ -719,12 +770,14 @@ export const TESTNET_NFT_PACKAGE_ID = "0x4192d...";        // NFT package ID
 ### **Development Debugging**
 
 **Enable Verbose Logging**
+
 ```typescript
 // In browser console
-localStorage.setItem('debug', '*');
+localStorage.setItem("debug", "*");
 ```
 
 **Check Smart Contract State**
+
 ```bash
 # View game store object
 sui client object <GAME_STORE_OBJECT_ID>
@@ -740,6 +793,7 @@ sui client objects <YOUR_ADDRESS>
 ### **Smart Contract Functions**
 
 **Game Store Contract**
+
 ```move
 // Publish a new game
 public fun publish_game_entry(
@@ -770,6 +824,7 @@ public fun withdraw_revenue(
 ```
 
 **NFT Contract**
+
 ```move
 // Mint game NFT
 public fun mint_game_nft(
@@ -791,6 +846,7 @@ public fun transfer_game(
 ## 🤝 **Contributing**
 
 ### **Development Setup**
+
 1. **Fork** the repository
 2. **Create feature branch**: `git checkout -b feature/amazing-feature`
 3. **Make changes** and test thoroughly
@@ -799,12 +855,14 @@ public fun transfer_game(
 6. **Open Pull Request** with detailed description
 
 ### **Code Standards**
+
 - **TypeScript**: Strict type checking enabled
 - **ESLint**: Code quality and consistency
 - **Prettier**: Automatic code formatting
 - **Testing**: Component and integration tests
 
 ### **Smart Contract Guidelines**
+
 - **Gas optimization**: Efficient Move code
 - **Security audits**: Thorough testing
 - **Documentation**: Comprehensive comments
@@ -814,7 +872,8 @@ public fun transfer_game(
 
 ## 📄 **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+for details.
 
 ---
 
@@ -829,8 +888,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 **Support & Community**
 
-- **🐛 Issues**: [GitHub Issues](https://github.com/smuushi/ethglobalny2025-dvs/issues)
-- **💬 Discussions**: [GitHub Discussions](https://github.com/smuushi/ethglobalny2025-dvs/discussions)
+- **🐛 Issues**:
+  [GitHub Issues](https://github.com/smuushi/ethglobalny2025-dvs/issues)
+- **💬 Discussions**:
+  [GitHub Discussions](https://github.com/smuushi/ethglobalny2025-dvs/discussions)
 - **📧 Contact**: [Email Support](mailto:support@coldcache.xyz)
 - **🐦 Updates**: [Twitter @ColdCache](https://twitter.com/coldcache)
 
@@ -840,7 +901,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - [ ] **Mobile App**: iOS and Android applications
 - [ ] **Game Reviews**: Community rating system
-- [ ] **Achievement System**: Blockchain-based achievements  
+- [ ] **Achievement System**: Blockchain-based achievements
 - [ ] **Multiplayer Support**: Decentralized game sessions
 - [ ] **Creator Tools**: In-browser game development
 - [ ] **Cross-Chain**: Multi-blockchain support
