@@ -78,10 +78,25 @@ export function Store() {
         );
         console.log(`💾 Using original filename: ${downloadFilename}`);
       } else {
-        // Fallback to game title with image extension
-        downloadFilename = `${gameTitle.replace(/[^a-zA-Z0-9]/g, "_")}_cover.jpg`;
-        console.log(`🏷️ Generated filename: ${downloadFilename}`);
+        console.log(`✅ Detected cover image type:`, fileType);
+        mimeType = fileType.mime;
+        fileExtension = `.${fileType.ext}`;
+
+        // Validate it's actually an image
+        if (!mimeType.startsWith("image/")) {
+          console.log(
+            `⚠️ Non-image file detected for cover (${mimeType}), defaulting to JPEG`,
+          );
+          mimeType = "image/jpeg";
+          fileExtension = ".jpg";
+        }
       }
+
+      // Create downloadable blob with correct MIME type
+      console.log(
+        `📁 Creating cover image blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
+      );
+      const imageBlob = new Blob([Uint8Array.from(imageBytes)], { type: mimeType });
 
       // Create download link that uses the CDN
       const link = document.createElement("a");
@@ -143,12 +158,53 @@ export function Store() {
           /[<>:"/\\|?*]/g,
           "_",
         );
-        console.log(`💾 Using original filename: ${downloadFilename}`);
-      } else {
-        // Fallback to game title with .zip extension
-        downloadFilename = `${gameTitle.replace(/[^a-zA-Z0-9]/g, "_")}.zip`;
-        console.log(`🏷️ Generated filename: ${downloadFilename}`);
       }
+
+      console.log(`✅ Detected file type:`, fileType);
+      console.log(`📁 MIME type: ${fileType.mime}`);
+      console.log(`📁 Extension: .${fileType.ext}`);
+
+      const mimeType = fileType.mime;
+      const fileExtension = `.${fileType.ext}`;
+
+      // Validate that it's a reasonable format for a game file
+      const gameFileFormats = [
+        "application/zip",
+        "application/x-rar-compressed",
+        "application/x-7z-compressed",
+        "application/x-tar",
+        "application/gzip",
+        "application/x-bzip2",
+        "application/x-msdownload", // .exe
+        "application/x-apple-diskimage", // .dmg
+        "application/octet-stream", // generic binary
+      ];
+
+      const textFormats = [
+        "text/html",
+        "text/plain",
+        "application/json",
+        "text/javascript",
+        "text/css",
+      ];
+
+      if (textFormats.includes(mimeType)) {
+        throw new Error(
+          `❌ Text/web file detected (${mimeType}). Expected archive or binary format for game files.`,
+        );
+      }
+
+      if (!gameFileFormats.includes(mimeType)) {
+        console.log(
+          `⚠️ Unusual file type for game: ${mimeType}. Allowing download but verify this is correct.`,
+        );
+      }
+
+      // Create downloadable blob with correct MIME type
+      console.log(
+        `📁 Creating game file blob with MIME type: ${mimeType}, extension: ${fileExtension}`,
+      );
+      const gameBlob = new Blob([gameBytes], { type: mimeType });
 
       // Create download link that uses the CDN
       const link = document.createElement("a");
