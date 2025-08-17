@@ -232,9 +232,9 @@ export class ColdCacheSeal {
    * @returns Promise<boolean> - true if user has access, false otherwise
    */
   async verifyOwnership(
-    gameId: string,
+    _gameId: string,
     userAddress: string,
-    sessionKey: SessionKey,
+    _sessionKey: SessionKey,
     moveCallConstructor: MoveCallConstructor,
   ): Promise<boolean> {
     try {

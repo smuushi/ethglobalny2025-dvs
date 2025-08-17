@@ -3,7 +3,6 @@ import { useParams, Link } from "react-router-dom";
 import {
   useSuiClientQuery,
   useCurrentAccount,
-  useSuiClient,
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
 import {
@@ -56,7 +55,6 @@ function PurchaseModal({ game, isOpen, onClose }: PurchaseModalProps) {
 
   // Sui hooks
   const currentAccount = useCurrentAccount();
-  const suiClient = useSuiClient();
   const gameStorePackageId = useNetworkVariable("gameStorePackageId");
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
 
