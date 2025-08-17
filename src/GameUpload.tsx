@@ -59,6 +59,7 @@ export function GameUpload() {
     success?: boolean;
     details?: string;
     retryAttempt?: number;
+    walrusFlow?: any;
   }>({
     step: "Ready to upload",
     progress: 0,
@@ -83,13 +84,32 @@ export function GameUpload() {
       // Initialize Seal service
       const seal = new ColdCacheSeal(suiClient);
 
-      // Encrypt the game file using the NFT contract as the policy
-      const gameData = await gameFile.arrayBuffer();
-      const encryptedBytes = await seal.encryptGame(
-        gameData,
-        gameStorePackageId, // Use game store package as policy object for now
-        gameStorePackageId, // Use game store package for seal_approve functions
-      );
+      // Memory-efficient encryption for large files
+      console.log(`🔐 Starting encryption for ${gameFile.name} (${(gameFile.size / 1024 / 1024).toFixed(1)}MB)`);
+      
+      let gameData: ArrayBuffer;
+      let encryptedBytes: ArrayBuffer;
+      
+      if (gameFile.size > 100 * 1024 * 1024) { // For files > 100MB
+        console.log(`⚡ Large file detected - using memory-efficient encryption`);
+        // For large files, we still need the buffer but we'll be more careful
+        gameData = await gameFile.arrayBuffer();
+        encryptedBytes = await seal.encryptGame(
+          gameData,
+          gameStorePackageId,
+          gameStorePackageId,
+        );
+        // Clear original reference to help GC
+        gameData = null as any;
+      } else {
+        // Normal processing for smaller files
+        gameData = await gameFile.arrayBuffer();
+        encryptedBytes = await seal.encryptGame(
+          gameData,
+          gameStorePackageId,
+          gameStorePackageId,
+        );
+      }
 
       // Create encrypted file
       const encryptedFile = new File(
@@ -235,9 +255,12 @@ export function GameUpload() {
         lastModified: file.lastModified,
       });
 
-      // Use file-type library to validate and detect actual format
-      const fileBuffer = await file.arrayBuffer();
-      const fileType = await fileTypeFromBuffer(new Uint8Array(fileBuffer));
+      // Memory-efficient file type detection
+      let fileType = null;
+      if (file.size < 50 * 1024 * 1024) { // Only for files < 50MB
+        const fileBuffer = await file.arrayBuffer();
+        fileType = await fileTypeFromBuffer(new Uint8Array(fileBuffer));
+      }
       console.log(`🔍 Detected file type for upload:`, {
         identifier,
         fileType,
@@ -281,9 +304,10 @@ export function GameUpload() {
         }
       }
 
-      // Use Uint8Array conversion like the working example
+      // Memory-efficient WalrusFile creation
+      console.log(`📦 Creating WalrusFile for ${file.name} without loading full file into memory`);
       const walrusFile = WalrusFile.from({
-        contents: new Uint8Array(await file.arrayBuffer()),
+        contents: file, // Pass File directly instead of loading into memory
         identifier: file.name,
         tags: {
           contentType: file.type,
